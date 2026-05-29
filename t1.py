@@ -6,7 +6,7 @@ pd.set_option('display.max_colwidth', None)
 
 ATIVO = "IBIT"
 
-#PROB_EXERC_MAX = 0.20          # probabilidade máxima de exercício
+PROB_EXERC_MAX = 0.80          # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
 #MULTIPLIER = 100               # padrão opções EUA
@@ -66,7 +66,7 @@ df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
 # Ranking para venda de call
 df_venda = df_calls_ajustado[
     (df_calls_ajustado["distancia_strike_pct"] > 0) &       # apenas OTM
-    (df_calls_ajustado["prob_exercicio"] <= 0.35) &          # risco de exercício controlado
+    (df_calls_ajustado["prob_exercicio"] <= PROB_EXERC_MAX) &  # risco de exercício controlado
     (df_calls_ajustado["retorno_anualizado_pct"] > 0)        # prêmio positivo
 ].copy()
 
