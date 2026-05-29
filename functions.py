@@ -244,7 +244,8 @@ def preparar_calls_para_modelo(
     seed=None,
     batch_size=500,
     t_min=0,
-    t_max=365
+    t_max=365,
+    dias_ano=365
 ):
     """
     Calcula metricas de contrato uma unica vez por cadeia de opcoes.
@@ -263,13 +264,13 @@ def preparar_calls_para_modelo(
         pd.to_datetime(df["expiration"]).dt.normalize()
         - pd.Timestamp.today().normalize()
     ).dt.days
-    df["T"] = df["dias_vencimento"] / 365
+    df["T"] = df["dias_vencimento"] / dias_ano
     df["premio"] = calcular_premio_vetor(df, usar_premio)
 
     df["distancia_strike_pct"] = (df["strike"] / df["preco_atual"]) - 1
     df["retorno_premio_pct"] = df["premio"] / df["preco_atual"]
     df["retorno_anualizado_pct"] = df["retorno_premio_pct"] * (
-        365 / df["dias_vencimento"]
+        dias_ano / df["dias_vencimento"]
     )
     
     df["preco_atual"] = preco_atual

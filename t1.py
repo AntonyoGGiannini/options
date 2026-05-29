@@ -12,6 +12,7 @@ DIVIDEND_YIELD = 0.00          # dividend yield anual
 #MULTIPLIER = 100               # padrão opções EUA
 
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
+DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
 
 #MIN_VOLUME = 100
 #MIN_OPEN_INTEREST = 100
@@ -38,7 +39,8 @@ df_calls = fn.preparar_calls_para_modelo(
     seed=42,
     batch_size=500,
     t_min=MIN_DIAS,
-    t_max=MAX_DIAS
+    t_max=MAX_DIAS,
+    dias_ano=DIAS_ANO
 )
 
 df_calls_ajustado = df_calls[
