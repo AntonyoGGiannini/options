@@ -58,24 +58,29 @@ df_calls_ajustado = df_calls[
 
 df_calls_ajustado["preco_atual"] = preco_atual
 df_calls_ajustado["rendimento"] = df_calls_ajustado["premio"] / preco_atual
+df_calls_ajustado["distancia_strike_pct"] = df_calls["distancia_strike_pct"]
+df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
 
-print(df_calls_ajustado)
-df_calls_ajustado.to_excel("df_calls_ajustado.xlsx", index=False)
+# Ranking para venda de call
+df_venda = df_calls_ajustado[
+    (df_calls_ajustado["distancia_strike_pct"] > 0) &       # apenas OTM
+    (df_calls_ajustado["prob_exercicio"] <= 0.35) &          # risco de exercício controlado
+    (df_calls_ajustado["retorno_anualizado_pct"] > 0)        # prêmio positivo
+].copy()
 
-# Fase por cliente: aplicar regras de suitability e ranking em cima do
-# catalogo de contratos ja calculado por ativo.
+# Score: retorno anualizado esperado ajustado pela probabilidade de expirar sem valor
+df_venda["score_venda"] = df_venda["retorno_anualizado_pct"] * (1 - df_venda["prob_exercicio"])
+df_venda = df_venda.sort_values("score_venda", ascending=False)
+df_venda["ranking"] = range(1, len(df_venda) + 1)
 
-# df_selecao = df_calls[
-#     (df_calls["dias_vencimento"] >= 15) &
-#     (df_calls["dias_vencimento"] <= 60) &
-#     (df_calls["distancia_strike_pct"] > 0) &
-#     (df_calls["prob_exercicio"] <= 0.20) &
-#     (df_calls["premio"] > 0)
-# ].copy()
+print(df_venda)
+df_venda.to_excel("df_calls_ajustado.xlsx", index=False)
 
-# df_selecao = df_selecao.sort_values(
-#     by=["retorno_anualizado_pct", "prob_exercicio"],
-#     ascending=[False, True]
-# )
-
-# print(df_selecao)
+if not df_venda.empty:
+    melhor = df_venda.iloc[0]
+    print(
+        f"\nMelhor call para vender: Strike {melhor['strike']} | "
+        f"Venc. {melhor['expiration']} | "
+        f"Score {melhor['score_venda']:.4f} | "
+        f"Prob. exercício {melhor['prob_exercicio']:.2%}"
+    )
