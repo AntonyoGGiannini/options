@@ -35,7 +35,7 @@ def _calcular_emp_row(historico_precos, preco_atual, strike, dias_janela):
     prob = calcular_probabilidade_empirica_exercicio(
         historico_precos, preco_atual, strike, dias_janela
     )
-    usou = not np.isnan(prob) if prob is not None else False
+    usou = not pd.isna(prob) if prob is not None else False
     return prob, usou
 
 
