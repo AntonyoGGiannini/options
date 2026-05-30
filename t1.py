@@ -9,7 +9,6 @@ ATIVO = "IBIT"
 PROB_EXERC_MAX = 0.80          # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
-#MULTIPLIER = 100               # padrão opções EUA
 
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
 DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
@@ -20,9 +19,9 @@ MIN_DIAS = 7
 MAX_DIAS = 45
 
 TAMANHO_CONTRATO = 100         # unidades por contrato (padrão EUA)
-CUSTO_COMPRA = 1.00            # custo de compra por contrato (USD)
-CUSTO_VENDA = 1.00             # custo de venda por contrato (USD)
-CUSTO_EXERCICIO = 5.00         # custo de exercício por contrato (USD)
+CUSTO_COMPRA = 0.00            # custo de compra por contrato (USD)
+CUSTO_VENDA = 0.00             # custo de venda por contrato (USD)
+CUSTO_EXERCICIO = 0.00         # custo de exercício por contrato (USD)
 
 df_calls = fn.obter_calls(ATIVO)
 
