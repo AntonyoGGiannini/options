@@ -8,8 +8,11 @@ pd.set_option('display.max_colwidth', None)
 # Configuração — edite aqui
 # ---------------------------------------------------------------------------
 
-LISTA_ATIVOS = ['IBIT', 'AAPL', 'IVV', 'NVDA', 'SPY']
-TOP_N = 3                      # top N opções por papel
+LISTA_ATIVOS = ['IBIT', 'AAPL', 'IVV', 'NVDA', 'SPY', 'META', 
+                'AMZN', 'GOOGL', 'TSLA', 'MSFT', 'TFLO', 'AGG',
+                'USFR', 'REMX', 'NU', 'TSM', 'GLD', 'AVEM', 
+                'VPL', 'BBEU']  # ativos para analisar
+TOP_N = 5                      # top N opções por papel
 
 # Preço médio de aquisição por ativo (opcional).
 # Usado apenas no gráfico de payoff da melhor opção geral.
@@ -29,7 +32,7 @@ USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
 DIAS_ANO    = 365
 
 MIN_DIAS = 7
-MAX_DIAS = 45
+MAX_DIAS = 20
 
 TAMANHO_CONTRATO = 100
 CUSTO_COMPRA     = 0.00
