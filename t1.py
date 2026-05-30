@@ -21,10 +21,10 @@ MIN_AMOSTRAS_EMPIRICA = 30     # mínimo de amostras históricas para calcular p
 MIN_DIAS = 7
 MAX_DIAS = 45
 
-#CUSTO_ABERTURA = 1.00          # custo por contrato
-#SLIPPAGE_PREMIO = 0.02         # 2% do prêmio
-#CUSTO_FIXO_EXERCICIO = 5.00
-#CUSTO_VAR_EXERCICIO = 0.00     # percentual sobre notional em caso de exercício
+TAMANHO_CONTRATO = 100         # unidades por contrato (padrão EUA)
+CUSTO_COMPRA = 1.00            # custo de compra por contrato (USD)
+CUSTO_VENDA = 1.00             # custo de venda por contrato (USD)
+CUSTO_EXERCICIO = 5.00         # custo de exercício por contrato (USD)
 
 df_calls = fn.obter_calls(ATIVO)
 
@@ -75,15 +75,25 @@ df_calls_ajustado["rendimento"] = df_calls_ajustado["premio"] / preco_atual
 df_calls_ajustado["distancia_strike_pct"] = df_calls["distancia_strike_pct"]
 df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
 
+# Custos por ação (contrato = TAMANHO_CONTRATO ações)
+custo_venda_por_acao = CUSTO_VENDA / TAMANHO_CONTRATO
+custo_exercicio_por_acao = CUSTO_EXERCICIO / TAMANHO_CONTRATO
+
+df_calls_ajustado["premio_liquido"] = df_calls_ajustado["premio"] - custo_venda_por_acao
+df_calls_ajustado["rendimento_liquido"] = df_calls_ajustado["premio_liquido"] / preco_atual
+df_calls_ajustado["retorno_anualizado_liquido"] = (
+    df_calls_ajustado["rendimento_liquido"] / df_calls_ajustado["T"]
+)
+
 # Ranking para venda de call
 df_venda = df_calls_ajustado[
     (df_calls_ajustado["distancia_strike_pct"] > 0) &              # apenas OTM
     (df_calls_ajustado["prob_exercicio_final"] <= PROB_EXERC_MAX) & # probabilidade final conservadora
-    (df_calls_ajustado["retorno_anualizado_pct"] > 0)               # prêmio positivo
+    (df_calls_ajustado["premio_liquido"] > 0)                       # prêmio positivo após custos
 ].copy()
 
-# Score: retorno anualizado esperado ajustado pela probabilidade final de expirar sem valor
-df_venda["score_venda"] = df_venda["retorno_anualizado_pct"] * (1 - df_venda["prob_exercicio_final"])
+# Score: retorno anualizado líquido ajustado pela probabilidade final de expirar sem valor
+df_venda["score_venda"] = df_venda["retorno_anualizado_liquido"] * (1 - df_venda["prob_exercicio_final"])
 df_venda = df_venda.sort_values("score_venda", ascending=False)
 df_venda["ranking"] = range(1, len(df_venda) + 1)
 
@@ -96,6 +106,8 @@ if not df_venda.empty:
         f"\nMelhor call para vender: Strike {melhor['strike']} | "
         f"Venc. {melhor['expiration']} | "
         f"Score {melhor['score_venda']:.4f} | "
+        f"Prêmio líquido ${melhor['premio_liquido']:.4f}/ação | "
+        f"Retorno anual líquido {melhor['retorno_anualizado_liquido']:.2%} | "
         f"Prob. final {melhor['prob_exercicio_final']:.2%} "
         f"(D2: {melhor['prob_d2']:.2%} | "
         f"Empírica: {melhor['prob_empirica']:.2%} | "
