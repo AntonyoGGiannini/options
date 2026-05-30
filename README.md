@@ -1,4 +1,4 @@
-# Options2
+# Options
 
 Ferramenta quantitativa para análise e ranking de **covered calls** em ativos de renda variável (ETFs e ações americanas). Combina três estimativas de probabilidade de exercício e custos de corretagem para identificar a melhor opção a vender dado o perfil de risco do usuário.
 
