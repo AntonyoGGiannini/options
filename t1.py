@@ -6,6 +6,11 @@ pd.set_option('display.max_colwidth', None)
 
 ATIVO = "IBIT"
 
+# Preço médio de aquisição da ação (opcional).
+# Preencher se quiser que o gráfico de payoff reflita o custo real da posição.
+# Se None, o gráfico usa o preço atual de mercado como referência.
+PRECO_MEDIO_AQUISICAO = None   # ex: 55.00
+
 PROB_EXERC_MAX = 0.80          # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
@@ -114,3 +119,12 @@ if not df_venda.empty:
         f"Prob. exercício final {melhor['prob_exercicio_final']:.2%} "
         f"(d2={melhor['prob_exercicio']:.2%}, empírica={melhor['prob_empirica']:.2%} se disponível)"
     )
+
+    arquivo = fn.gerar_grafico_payoff_covered_call(
+        preco_atual=preco_atual,
+        strike=melhor["strike"],
+        premio=melhor["premio"],
+        expiration=melhor["expiration"],
+        preco_custo=PRECO_MEDIO_AQUISICAO,
+    )
+    print(f"Gráfico de payoff salvo em: {arquivo}")
