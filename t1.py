@@ -6,9 +6,19 @@ pd.set_option('display.max_colwidth', None)
 
 ATIVO = "IBIT"
 
+# Preço médio de aquisição da ação (opcional).
+# Preencher se quiser que o gráfico de payoff reflita o custo real da posição.
+# Se None, o gráfico usa o preço atual de mercado como referência.
+PRECO_MEDIO_AQUISICAO = None   # ex: 55.00
+
 PROB_EXERC_MAX = 0.80          # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
+
+USAR_PROB_D2       = True      # usar probabilidade risk-neutral Black-Scholes d2
+USAR_PROB_MC       = True      # usar probabilidade Monte Carlo
+USAR_PROB_EMPIRICA = True      # usar probabilidade histórica empírica
+PERIODO_HISTORICO  = "5y"      # período de histórico para probabilidade empírica
 
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
 DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
@@ -30,6 +40,8 @@ df_calls = fn.obter_calls(ATIVO)
 preco_atual = fn.calcular_preco_atual(ATIVO)
 historico = fn.obter_historico_precos(ATIVO, PERIODO_HISTORICO)
 
+historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
+
 df_calls = fn.preparar_calls_para_modelo(
     df_calls=df_calls,
     preco_atual=preco_atual,
@@ -44,7 +56,9 @@ df_calls = fn.preparar_calls_para_modelo(
     t_max=MAX_DIAS,
     dias_ano=DIAS_ANO,
     historico_precos=historico,
-    min_amostras_empirica=MIN_AMOSTRAS_EMPIRICA,
+    usar_prob_d2=USAR_PROB_D2,
+    usar_prob_mc=USAR_PROB_MC,
+    usar_prob_empirica=USAR_PROB_EMPIRICA,
 )
 
 df_calls_ajustado = df_calls[
@@ -66,6 +80,11 @@ df_calls_ajustado = df_calls[
         "usa_prob_empirica",
         "prob_exercicio_final",
         "prob_exercicio_mc",
+        "prob_empirica",
+        "usa_prob_empirica",
+        "prob_exercicio_final",
+        "retorno_necessario",
+        "dias_uteis_ate_vencimento",
     ]
 ].copy()
 
@@ -86,13 +105,13 @@ df_calls_ajustado["retorno_anualizado_liquido"] = (
 
 # Ranking para venda de call
 df_venda = df_calls_ajustado[
-    (df_calls_ajustado["distancia_strike_pct"] > 0) &              # apenas OTM
-    (df_calls_ajustado["prob_exercicio_final"] <= PROB_EXERC_MAX) & # probabilidade final conservadora
-    (df_calls_ajustado["premio_liquido"] > 0)                       # prêmio positivo após custos
+    (df_calls_ajustado["distancia_strike_pct"] > 0) &                    # apenas OTM
+    (df_calls_ajustado["prob_exercicio_final"] <= PROB_EXERC_MAX) &       # risco de exercício controlado
+    (df_calls_ajustado["retorno_anualizado_pct"] > 0)                     # prêmio positivo
 ].copy()
 
-# Score: retorno anualizado líquido ajustado pela probabilidade final de expirar sem valor
-df_venda["score_venda"] = df_venda["retorno_anualizado_liquido"] * (1 - df_venda["prob_exercicio_final"])
+# Score: retorno anualizado esperado ajustado pela probabilidade de expirar sem valor
+df_venda["score_venda"] = df_venda["retorno_anualizado_pct"] * (1 - df_venda["prob_exercicio_final"])
 df_venda = df_venda.sort_values("score_venda", ascending=False)
 df_venda["ranking"] = range(1, len(df_venda) + 1)
 
@@ -105,10 +124,15 @@ if not df_venda.empty:
         f"\nMelhor call para vender: Strike {melhor['strike']} | "
         f"Venc. {melhor['expiration']} | "
         f"Score {melhor['score_venda']:.4f} | "
-        f"Prêmio líquido ${melhor['premio_liquido']:.4f}/ação | "
-        f"Retorno anual líquido {melhor['retorno_anualizado_liquido']:.2%} | "
-        f"Prob. final {melhor['prob_exercicio_final']:.2%} "
-        f"(D2: {melhor['prob_d2']:.2%} | "
-        f"Empírica: {melhor['prob_empirica']:.2%} | "
-        f"Usa empírica: {melhor['usa_prob_empirica']})"
+        f"Prob. exercício final {melhor['prob_exercicio_final']:.2%} "
+        f"(d2={melhor['prob_exercicio']:.2%}, empírica={melhor['prob_empirica']:.2%} se disponível)"
     )
+
+    arquivo = fn.gerar_grafico_payoff_covered_call(
+        preco_atual=preco_atual,
+        strike=melhor["strike"],
+        premio=melhor["premio"],
+        expiration=melhor["expiration"],
+        preco_custo=PRECO_MEDIO_AQUISICAO,
+    )
+    print(f"Gráfico de payoff salvo em: {arquivo}")

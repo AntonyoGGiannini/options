@@ -1,7 +1,43 @@
 from scipy.stats import norm
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import yfinance as yf
 import pandas as pd
 import numpy as np
+
+def carregar_historico_ativo(ativo, periodo="5y"):
+    ticker = yf.Ticker(ativo)
+    hist = ticker.history(period=periodo, auto_adjust=True)
+    if hist.empty:
+        return pd.Series(dtype=float)
+    return hist["Close"].dropna()
+
+
+def calcular_probabilidade_empirica_exercicio(precos, preco_atual, strike, dias_janela):
+    """
+    Calcula a frequência histórica em que o ativo teve retorno futuro
+    maior ou igual ao retorno necessário para atingir o strike.
+    """
+    if dias_janela <= 0 or preco_atual <= 0 or strike <= 0:
+        return np.nan
+    if len(precos) < 2 * dias_janela:
+        return np.nan
+    retorno_necessario = (strike / preco_atual) - 1
+    retorno_futuro = precos.shift(-dias_janela) / precos - 1
+    retorno_futuro = retorno_futuro.dropna()
+    if len(retorno_futuro) == 0:
+        return np.nan
+    return float((retorno_futuro >= retorno_necessario).mean())
+
+
+def _calcular_emp_row(historico_precos, preco_atual, strike, dias_janela):
+    prob = calcular_probabilidade_empirica_exercicio(
+        historico_precos, preco_atual, strike, dias_janela
+    )
+    usou = not np.isnan(prob) if prob is not None else False
+    return prob, usou
+
 
 def calcular_preco_atual(ativo):
     ticker = yf.Ticker(ativo)
@@ -279,7 +315,9 @@ def preparar_calls_para_modelo(
     t_max=365,
     dias_ano=365,
     historico_precos=None,
-    min_amostras_empirica=30,
+    usar_prob_d2=True,
+    usar_prob_mc=True,
+    usar_prob_empirica=True,
 ):
     """
     Calcula metricas de contrato uma unica vez por cadeia de opcoes.
@@ -318,26 +356,56 @@ def preparar_calls_para_modelo(
 
     df = df[(df["dias_vencimento"] >= t_min) & (df["dias_vencimento"] <= t_max)].copy()
 
-    df["prob_d2"] = calcular_prob_exercicio_risk_neutral_vetor(
-        df["preco_atual"].to_numpy(),
-        df["strike"].to_numpy(),
-        df["T"].to_numpy(),
-        taxa_livre_risco,
-        dividend_yield,
-        df["impliedVolatility"].to_numpy()
-    )
+    if usar_prob_d2:
+        df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
+            df["preco_atual"].to_numpy(),
+            df["strike"].to_numpy(),
+            df["T"].to_numpy(),
+            taxa_livre_risco,
+            dividend_yield,
+            df["impliedVolatility"].to_numpy()
+        )
+    else:
+        df["prob_exercicio"] = np.nan
 
-    df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
-        df["preco_atual"].to_numpy(),
-        df["strike"].to_numpy(),
-        df["T"].to_numpy(),
-        mu=mu,
-        sigma=df["impliedVolatility"].to_numpy(),
-        q=dividend_yield,
-        n_simulacoes=n_simulacoes,
-        seed=seed,
-        batch_size=batch_size
-    )
+    if usar_prob_mc:
+        df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
+            df["preco_atual"].to_numpy(),
+            df["strike"].to_numpy(),
+            df["T"].to_numpy(),
+            mu=mu,
+            sigma=df["impliedVolatility"].to_numpy(),
+            q=dividend_yield,
+            n_simulacoes=n_simulacoes,
+            seed=seed,
+            batch_size=batch_size
+        )
+    else:
+        df["prob_exercicio_mc"] = np.nan
+
+    df["retorno_necessario"] = (df["strike"] / df["preco_atual"]) - 1
+    df["dias_uteis_ate_vencimento"] = df["dias_vencimento"]
+
+    if usar_prob_empirica and historico_precos is not None and len(historico_precos) > 0:
+        prob_emp_lista = []
+        usa_emp_lista = []
+        for _, row in df.iterrows():
+            dias_janela = int(row["dias_vencimento"])
+            p, usou = _calcular_emp_row(historico_precos, row["preco_atual"], row["strike"], dias_janela)
+            prob_emp_lista.append(p)
+            usa_emp_lista.append(usou)
+        df["prob_empirica"] = prob_emp_lista
+        df["usa_prob_empirica"] = usa_emp_lista
+    else:
+        df["prob_empirica"] = np.nan
+        df["usa_prob_empirica"] = False
+
+    # Probabilidade final conservadora: max(prob_d2, prob_empirica)
+    prob_d2_series = df["prob_exercicio"] if usar_prob_d2 else pd.Series(np.nan, index=df.index)
+    prob_emp_series = df["prob_empirica"]
+    df["prob_exercicio_final"] = prob_d2_series.combine(prob_emp_series, lambda a, b: (
+        max(x for x in [a, b] if pd.notna(x)) if any(pd.notna(x) for x in [a, b]) else np.nan
+    ))
 
     if historico_precos is not None:
         probs_emp, usa_emp = calcular_probabilidade_empirica_batch(
@@ -396,3 +464,73 @@ def obter_calls(ativo):
         df_calls = pd.DataFrame()
 
     return df_calls
+
+
+def gerar_grafico_payoff_covered_call(
+    preco_atual,
+    strike,
+    premio,
+    expiration,
+    preco_custo=None,
+    arquivo_saida="payoff_covered_call.png",
+):
+    """
+    Gera gráfico de payoff ao vencimento de uma covered call.
+
+    preco_custo: preço médio de aquisição da ação; se None, usa preco_atual.
+    """
+    custo = preco_custo if preco_custo is not None else preco_atual
+
+    s_min = preco_atual * 0.5
+    s_max = preco_atual * 1.5
+    ST = np.linspace(s_min, s_max, 300)
+
+    ganho_acao = ST - custo
+    payoff_call_vendida = -np.maximum(ST - strike, 0) + premio
+    payoff_total = ganho_acao + payoff_call_vendida
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(ST, ganho_acao, color="#5B9BD5", linewidth=1.5, linestyle="--", label="Ação isolada")
+    ax.plot(ST, payoff_total, color="#ED7D31", linewidth=2.5, label="Covered Call")
+
+    ax.axhline(0, color="black", linewidth=0.8, linestyle="-")
+    ax.axvline(preco_atual, color="#5B9BD5", linewidth=1.0, linestyle=":", alpha=0.8, label=f"Preço atual  ${preco_atual:.2f}")
+    ax.axvline(strike, color="#ED7D31", linewidth=1.0, linestyle=":", alpha=0.8, label=f"Strike  ${strike:.2f}")
+
+    if preco_custo is not None and abs(preco_custo - preco_atual) > 0.01:
+        ax.axvline(preco_custo, color="#70AD47", linewidth=1.0, linestyle=":", alpha=0.8, label=f"Preço médio  ${preco_custo:.2f}")
+
+    # Anotação do prêmio recebido
+    ax.annotate(
+        f"Prêmio recebido: ${premio:.2f}",
+        xy=(s_min + (s_max - s_min) * 0.04, premio),
+        fontsize=9,
+        color="#ED7D31",
+        va="bottom",
+    )
+
+    # Breakeven da covered call: custo - premio
+    breakeven = custo - premio
+    if s_min < breakeven < s_max:
+        ax.axvline(breakeven, color="gray", linewidth=0.8, linestyle="--", alpha=0.6)
+        ax.annotate(
+            f"Breakeven ${breakeven:.2f}",
+            xy=(breakeven, ax.get_ylim()[0] if ax.get_ylim()[0] != 0 else -premio * 2),
+            xytext=(4, 4),
+            textcoords="offset points",
+            fontsize=8,
+            color="gray",
+        )
+
+    ax.set_xlabel("Preço do ativo no vencimento (USD)")
+    ax.set_ylabel("Lucro / Prejuízo por ação (USD)")
+    ax.set_title(f"Payoff — Covered Call | Strike ${strike:.2f} | Venc. {expiration} | Prêmio ${premio:.2f}")
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(arquivo_saida, dpi=150)
+    plt.close(fig)
+
+    return arquivo_saida
