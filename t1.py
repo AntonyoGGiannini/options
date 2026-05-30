@@ -4,147 +4,149 @@ import functions as fn
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_colwidth', None)
 
-ATIVO = "IBIT"
+# ---------------------------------------------------------------------------
+# Configuração — edite aqui
+# ---------------------------------------------------------------------------
 
-# Preço médio de aquisição da ação (opcional).
-# Preencher se quiser que o gráfico de payoff reflita o custo real da posição.
-# Se None, o gráfico usa o preço atual de mercado como referência.
-PRECO_MEDIO_AQUISICAO = 45.49   # ex: 55.00
+LISTA_ATIVOS = ['IBIT', 'AAPL', 'IVV', 'NVDA', 'SPY']
+TOP_N = 3                      # top N opções por papel
 
-PROB_EXERC_MAX = 0.15          # probabilidade máxima de exercício aceita pelo usuário
+# Preço médio de aquisição por ativo (opcional).
+# Usado apenas no gráfico de payoff da melhor opção geral.
+# None = usar preço atual de mercado.
+PRECO_MEDIO_AQUISICAO = None   # ex: {'IBIT': 55.00, 'AAPL': 180.00}
+
+PROB_EXERC_MAX   = 0.15        # probabilidade máxima de exercício
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
-DIVIDEND_YIELD = 0.00          # dividend yield anual
+DIVIDEND_YIELD   = 0.00        # dividend yield anual (único para todos; ajuste se necessário)
 
-USAR_PROB_D2       = True      # usar probabilidade risk-neutral Black-Scholes d2
-USAR_PROB_MC       = True      # usar probabilidade Monte Carlo
-USAR_PROB_EMPIRICA = True      # usar probabilidade histórica empírica
-PERIODO_HISTORICO  = "5y"      # período de histórico para probabilidade empírica
+USAR_PROB_D2       = True      # probabilidade risk-neutral Black-Scholes d2
+USAR_PROB_MC       = True      # probabilidade Monte Carlo
+USAR_PROB_EMPIRICA = True      # probabilidade histórica empírica
+PERIODO_HISTORICO  = "5y"      # janela de histórico para prob empírica
 
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
-DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
-
-# --- Modo offline -----------------------------------------------------------
-# MODO_OFFLINE = True  → lê dados de arquivos locais (sem internet / sem yfinance)
-# SALVAR_MOCK  = True  → ao rodar online, salva os dados para uso posterior offline
-# PASTA_MOCK          → pasta onde ficam/serão salvos os arquivos mock
-MODO_OFFLINE = False
-SALVAR_MOCK  = False
-PASTA_MOCK   = "."
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-GERAR_GRAFICO_PAYOFF = False  # gerar gráfico de payoff para a melhor opção de venda de call
-# ---------------------------------------------------------------------------
+DIAS_ANO    = 365
 
 MIN_DIAS = 7
 MAX_DIAS = 45
 
-TAMANHO_CONTRATO = 100         # unidades por contrato (padrão EUA)
-CUSTO_COMPRA = 0.00            # custo de compra por contrato (USD)
-CUSTO_VENDA = 0.00             # custo de venda por contrato (USD)
-CUSTO_EXERCICIO = 0.00         # custo de exercício por contrato (USD)
+TAMANHO_CONTRATO = 100
+CUSTO_COMPRA     = 0.00
+CUSTO_VENDA      = 0.00
+CUSTO_EXERCICIO  = 0.00
 
-if MODO_OFFLINE:
-    df_calls, preco_atual, historico = fn.carregar_dados_mock(ATIVO, PASTA_MOCK)
-    if not USAR_PROB_EMPIRICA:
-        historico = None
-else:
-    df_calls = fn.obter_calls(ATIVO)
-    preco_atual = fn.calcular_preco_atual(ATIVO)
-    historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
-    if SALVAR_MOCK:
-        fn.salvar_dados_mock(ATIVO, df_calls, preco_atual, historico, PASTA_MOCK)
+# --- Modo offline -----------------------------------------------------------
+MODO_OFFLINE = False   # True = lê arquivos mock locais (sem internet)
+SALVAR_MOCK  = False   # True = salva arquivos mock ao rodar online
+PASTA_MOCK   = "."
+# ---------------------------------------------------------------------------
 
-df_calls = fn.preparar_calls_para_modelo(
-    df_calls=df_calls,
-    preco_atual=preco_atual,
-    taxa_livre_risco=TAXA_LIVRE_RISCO,
-    dividend_yield=DIVIDEND_YIELD,
-    usar_premio=USAR_PREMIO,
-    mu=0.00, # depois quando tiver back-test pode testar usar retorno_historico_anualizado
-    n_simulacoes=500000,
-    seed=42,
-    batch_size=500,
-    t_min=MIN_DIAS,
-    t_max=MAX_DIAS,
-    dias_ano=DIAS_ANO,
-    historico_precos=historico,
-    usar_prob_d2=USAR_PROB_D2,
-    usar_prob_mc=USAR_PROB_MC,
-    usar_prob_empirica=USAR_PROB_EMPIRICA,
-)
+# ---------------------------------------------------------------------------
+# Processamento multi-ativo
+# ---------------------------------------------------------------------------
 
-df_calls_ajustado = df_calls[
-    [
-        "expiration",
-        "strike",
-        "T",
-        "dias_uteis_ate_vencimento",
-        "bid",
-        "ask",
-        "lastPrice",
-        "volume",
-        "openInterest",
-        "premio",
-        "impliedVolatility",
-        "retorno_necessario",
-        "prob_exercicio",
-        "prob_exercicio_mc",
-        "prob_empirica",
-        "usa_prob_empirica",
-        "prob_exercicio_final",
-    ]
-].copy()
+resultados = []
 
-# Custos por ação (contrato = TAMANHO_CONTRATO ações)
-custo_venda_por_acao = CUSTO_VENDA / TAMANHO_CONTRATO
-custo_exercicio_por_acao = CUSTO_EXERCICIO / TAMANHO_CONTRATO
+for ativo in LISTA_ATIVOS:
+    print(f"\n>>> Processando {ativo}...")
+    df_top = fn.processar_ativo(
+        ativo=ativo,
+        taxa_livre_risco=TAXA_LIVRE_RISCO,
+        dividend_yield=DIVIDEND_YIELD,
+        usar_premio=USAR_PREMIO,
+        mu=0.00,
+        n_simulacoes=50000,
+        seed=42,
+        batch_size=500,
+        t_min=MIN_DIAS,
+        t_max=MAX_DIAS,
+        dias_ano=DIAS_ANO,
+        usar_prob_d2=USAR_PROB_D2,
+        usar_prob_mc=USAR_PROB_MC,
+        usar_prob_empirica=USAR_PROB_EMPIRICA,
+        periodo_historico=PERIODO_HISTORICO,
+        min_amostras_empirica=30,
+        prob_exerc_max=PROB_EXERC_MAX,
+        custo_venda=CUSTO_VENDA,
+        tamanho_contrato=TAMANHO_CONTRATO,
+        top_n=TOP_N,
+        modo_offline=MODO_OFFLINE,
+        salvar_mock=SALVAR_MOCK,
+        pasta_mock=PASTA_MOCK,
+    )
+    resultados.append(df_top)
 
-df_calls_ajustado["preco_atual"] = preco_atual
-df_calls_ajustado["rendimento"] = df_calls_ajustado["premio"] / preco_atual
-df_calls_ajustado["distancia_strike_pct"] = df_calls["distancia_strike_pct"]
-df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
+df_final = pd.concat([r for r in resultados if not r.empty], ignore_index=True)
 
-df_calls_ajustado["premio_liquido"] = df_calls_ajustado["premio"] - custo_venda_por_acao
-df_calls_ajustado["rendimento_liquido"] = df_calls_ajustado["premio_liquido"] / preco_atual
-df_calls_ajustado["retorno_anualizado_liquido"] = (
-    df_calls_ajustado["rendimento_liquido"] / df_calls_ajustado["T"])
+# ---------------------------------------------------------------------------
+# Colunas do output
+# ---------------------------------------------------------------------------
 
-# Ranking para venda de call
-df_venda = df_calls_ajustado[
-    (df_calls_ajustado["distancia_strike_pct"] > 0) &                    # apenas OTM
-    (df_calls_ajustado["prob_exercicio_final"] <= PROB_EXERC_MAX) &       # risco de exercício controlado
-    (df_calls_ajustado["retorno_anualizado_pct"] > 0)                     # prêmio positivo
-].copy()
+COLUNAS_OUTPUT = [
+    "ativo",
+    "ranking_ativo",
+    "strike",
+    "premio",
+    "expiration",
+    "dias_uteis_ate_vencimento",
+    "prob_exercicio",
+    "prob_empirica",
+    "prob_exercicio_final",
+    "retorno_anualizado_pct",
+    "retorno_anualizado_liquido",
+    "bid",
+    "ask",
+    "volume",
+    "openInterest",
+    "preco_atual_ativo",
+    "score_venda",
+]
 
-# Score: retorno anualizado esperado ajustado pela probabilidade de expirar sem valor
-df_venda["score_venda"] = df_venda["retorno_anualizado_pct"] * (1 - df_venda["prob_exercicio_final"])
-df_venda = df_venda.sort_values("score_venda", ascending=False)
-df_venda["ranking"] = range(1, len(df_venda) + 1)
+# Mantém apenas colunas que existem (tolerante a ativos sem MC ou empírica)
+colunas_presentes = [c for c in COLUNAS_OUTPUT if c in df_final.columns]
+df_output = df_final[colunas_presentes].copy()
 
-df_venda.to_excel("df_calls_ajustado.xlsx", index=False)
+# ---------------------------------------------------------------------------
+# Print e Excel
+# ---------------------------------------------------------------------------
 
-if not df_venda.empty:
-    for i in range(0, 3):
-        try:
-            melhor = df_venda.iloc[i]
-            prob_emp_str = f"{melhor['prob_empirica']:.2%}" if not pd.isna(melhor['prob_empirica']) else "N/A"
-            print(
-                f"\nStrike {melhor['strike']} | Premio {melhor['premio']:.2f} | "
-                f"Venc. {melhor['expiration']} | "
-                f"Prob. exercicio {melhor['prob_exercicio_final']:.2%} "
-                f"(d2={melhor['prob_exercicio']:.2%}, empirica={prob_emp_str}) | "
-                f"Retorno anualizado {melhor['retorno_anualizado_pct']:.2%} "
-            )
-        except IndexError:
-            break
-        
-    if GERAR_GRAFICO_PAYOFF:
-        arquivo = fn.gerar_grafico_payoff_covered_call(
-            preco_atual=preco_atual,
-            strike=melhor["strike"],
-            premio=melhor["premio"],
-            expiration=melhor["expiration"],
-            preco_custo=PRECO_MEDIO_AQUISICAO,
-        )
-        print(f"Grafico de payoff salvo em: {arquivo}")
+print("\n" + "=" * 80)
+print(f"TOP {TOP_N} COVERED CALLS POR ATIVO")
+print("=" * 80)
+print(df_output.to_string(index=False))
+
+df_output.to_excel("top_opcoes_covered_call.xlsx", index=False)
+print(f"\nResultados salvos em: top_opcoes_covered_call.xlsx")
+
+# ---------------------------------------------------------------------------
+# Gráfico da melhor opção geral
+# ---------------------------------------------------------------------------
+
+if not df_final.empty:
+    melhor = df_final.sort_values("score_venda", ascending=False).iloc[0]
+    ativo_melhor = melhor["ativo"]
+
+    preco_custo = None
+    if isinstance(PRECO_MEDIO_AQUISICAO, dict):
+        preco_custo = PRECO_MEDIO_AQUISICAO.get(ativo_melhor)
+    elif isinstance(PRECO_MEDIO_AQUISICAO, (int, float)):
+        preco_custo = PRECO_MEDIO_AQUISICAO
+
+    prob_emp_str = f"{melhor['prob_empirica']:.2%}" if not pd.isna(melhor['prob_empirica']) else "N/A"
+    print(
+        f"\nMelhor opção geral: {ativo_melhor} | Strike {melhor['strike']} | "
+        f"Venc. {melhor['expiration']} | Score {melhor['score_venda']:.4f} | "
+        f"Prob. final {melhor['prob_exercicio_final']:.2%} "
+        f"(d2={melhor['prob_exercicio']:.2%}, empírica={prob_emp_str})"
+    )
+
+    arquivo = fn.gerar_grafico_payoff_covered_call(
+        preco_atual=melhor["preco_atual_ativo"],
+        strike=melhor["strike"],
+        premio=melhor["premio"],
+        expiration=melhor["expiration"],
+        preco_custo=preco_custo,
+        arquivo_saida=f"payoff_{ativo_melhor}.png",
+    )
+    print(f"Gráfico de payoff salvo em: {arquivo}")
