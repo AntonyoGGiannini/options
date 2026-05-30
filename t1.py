@@ -11,7 +11,7 @@ ATIVO = "IBIT"
 # Se None, o gráfico usa o preço atual de mercado como referência.
 PRECO_MEDIO_AQUISICAO = None   # ex: 55.00
 
-PROB_EXERC_MAX = 0.80          # probabilidade máxima de exercício aceita pelo usuário
+PROB_EXERC_MAX = 0.15         # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
 
@@ -25,8 +25,6 @@ DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e ren
 PERIODO_HISTORICO = "5y"       # janela de histórico para probabilidade empírica
 MIN_AMOSTRAS_EMPIRICA = 30     # mínimo de amostras históricas para calcular prob empírica
 
-#MIN_VOLUME = 100
-#MIN_OPEN_INTEREST = 100
 MIN_DIAS = 7
 MAX_DIAS = 45
 
@@ -82,7 +80,6 @@ df_calls_ajustado = df_calls[
         "prob_exercicio_mc",
         "prob_empirica",
         "usa_prob_empirica",
-        "prob_exercicio_final",
         "retorno_necessario",
         "dias_uteis_ate_vencimento",
     ]
