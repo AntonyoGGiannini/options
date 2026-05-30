@@ -22,8 +22,15 @@ PERIODO_HISTORICO  = "5y"      # período de histórico para probabilidade empí
 
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
 DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
-PERIODO_HISTORICO = "5y"       # janela de histórico para probabilidade empírica
-MIN_AMOSTRAS_EMPIRICA = 30     # mínimo de amostras históricas para calcular prob empírica
+
+# --- Modo offline -----------------------------------------------------------
+# MODO_OFFLINE = True  → lê dados de arquivos locais (sem internet / sem yfinance)
+# SALVAR_MOCK  = True  → ao rodar online, salva os dados para uso posterior offline
+# PASTA_MOCK          → pasta onde ficam/serão salvos os arquivos mock
+MODO_OFFLINE = False
+SALVAR_MOCK  = False
+PASTA_MOCK   = "."
+# ---------------------------------------------------------------------------
 
 MIN_DIAS = 7
 MAX_DIAS = 45
@@ -33,12 +40,16 @@ CUSTO_COMPRA = 0.00            # custo de compra por contrato (USD)
 CUSTO_VENDA = 0.00             # custo de venda por contrato (USD)
 CUSTO_EXERCICIO = 0.00         # custo de exercício por contrato (USD)
 
-df_calls = fn.obter_calls(ATIVO)
-
-preco_atual = fn.calcular_preco_atual(ATIVO)
-historico = fn.obter_historico_precos(ATIVO, PERIODO_HISTORICO)
-
-historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
+if MODO_OFFLINE:
+    df_calls, preco_atual, historico = fn.carregar_dados_mock(ATIVO, PASTA_MOCK)
+    if not USAR_PROB_EMPIRICA:
+        historico = None
+else:
+    df_calls = fn.obter_calls(ATIVO)
+    preco_atual = fn.calcular_preco_atual(ATIVO)
+    historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
+    if SALVAR_MOCK:
+        fn.salvar_dados_mock(ATIVO, df_calls, preco_atual, historico, PASTA_MOCK)
 
 df_calls = fn.preparar_calls_para_modelo(
     df_calls=df_calls,
@@ -73,15 +84,11 @@ df_calls_ajustado = df_calls[
         "premio",
         "impliedVolatility",
         "retorno_necessario",
-        "prob_d2",
-        "prob_empirica",
-        "usa_prob_empirica",
-        "prob_exercicio_final",
+        "prob_exercicio",
         "prob_exercicio_mc",
         "prob_empirica",
         "usa_prob_empirica",
-        "retorno_necessario",
-        "dias_uteis_ate_vencimento",
+        "prob_exercicio_final",
     ]
 ].copy()
 
@@ -117,12 +124,13 @@ df_venda.to_excel("df_calls_ajustado.xlsx", index=False)
 
 if not df_venda.empty:
     melhor = df_venda.iloc[0]
+    prob_emp_str = f"{melhor['prob_empirica']:.2%}" if not pd.isna(melhor['prob_empirica']) else "N/A"
     print(
         f"\nMelhor call para vender: Strike {melhor['strike']} | "
         f"Venc. {melhor['expiration']} | "
         f"Score {melhor['score_venda']:.4f} | "
         f"Prob. exercício final {melhor['prob_exercicio_final']:.2%} "
-        f"(d2={melhor['prob_exercicio']:.2%}, empírica={melhor['prob_empirica']:.2%} se disponível)"
+        f"(d2={melhor['prob_exercicio']:.2%}, empírica={prob_emp_str})"
     )
 
     arquivo = fn.gerar_grafico_payoff_covered_call(
