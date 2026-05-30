@@ -358,6 +358,106 @@ def preparar_calls_para_modelo(
 
 
 # ---------------------------------------------------------------------------
+# Multi-ativo
+# ---------------------------------------------------------------------------
+
+def processar_ativo(
+    ativo,
+    taxa_livre_risco,
+    dividend_yield,
+    usar_premio,
+    mu,
+    n_simulacoes,
+    seed,
+    batch_size,
+    t_min,
+    t_max,
+    dias_ano,
+    usar_prob_d2,
+    usar_prob_mc,
+    usar_prob_empirica,
+    periodo_historico,
+    min_amostras_empirica,
+    prob_exerc_max,
+    custo_venda,
+    tamanho_contrato,
+    top_n=3,
+    modo_offline=False,
+    salvar_mock=False,
+    pasta_mock=".",
+):
+    """
+    Processa um único ativo: obtém calls, calcula probabilidades,
+    aplica filtros e retorna as top_n opções ranqueadas por score.
+    Retorna DataFrame vazio com aviso em caso de erro.
+    """
+    try:
+        if modo_offline:
+            df_calls, preco_atual, historico = carregar_dados_mock(ativo, pasta_mock)
+            if not usar_prob_empirica:
+                historico = None
+        else:
+            df_calls   = obter_calls(ativo)
+            preco_atual = calcular_preco_atual(ativo)
+            historico  = carregar_historico_ativo(ativo, periodo=periodo_historico) if usar_prob_empirica else None
+            if salvar_mock:
+                salvar_dados_mock(ativo, df_calls, preco_atual, historico, pasta_mock)
+
+        if df_calls.empty:
+            print(f"[{ativo}] Nenhuma opção disponível após filtros de liquidez.")
+            return pd.DataFrame()
+
+        df = preparar_calls_para_modelo(
+            df_calls=df_calls,
+            preco_atual=preco_atual,
+            taxa_livre_risco=taxa_livre_risco,
+            dividend_yield=dividend_yield,
+            usar_premio=usar_premio,
+            mu=mu,
+            n_simulacoes=n_simulacoes,
+            seed=seed,
+            batch_size=batch_size,
+            t_min=t_min,
+            t_max=t_max,
+            dias_ano=dias_ano,
+            historico_precos=historico,
+            usar_prob_d2=usar_prob_d2,
+            usar_prob_mc=usar_prob_mc,
+            usar_prob_empirica=usar_prob_empirica,
+            min_amostras_empirica=min_amostras_empirica,
+        )
+
+        custo_venda_por_acao = custo_venda / tamanho_contrato
+        df["premio_liquido"]           = df["premio"] - custo_venda_por_acao
+        df["rendimento_liquido"]       = df["premio_liquido"] / df["preco_atual"]
+        df["retorno_anualizado_liquido"] = df["rendimento_liquido"] / df["T"]
+
+        df_filtrado = df[
+            (df["distancia_strike_pct"] > 0) &
+            (df["prob_exercicio_final"] <= prob_exerc_max) &
+            (df["retorno_anualizado_pct"] > 0)
+        ].copy()
+
+        if df_filtrado.empty:
+            print(f"[{ativo}] Nenhuma opção passou nos filtros (prob/prazo/retorno).")
+            return pd.DataFrame()
+
+        df_filtrado["score_venda"] = (
+            df_filtrado["retorno_anualizado_pct"] * (1 - df_filtrado["prob_exercicio_final"])
+        )
+        df_filtrado = df_filtrado.sort_values("score_venda", ascending=False)
+        df_filtrado["ranking_ativo"] = range(1, len(df_filtrado) + 1)
+        df_filtrado["ativo"] = ativo
+        df_filtrado["preco_atual_ativo"] = preco_atual
+
+        return df_filtrado.head(top_n)
+
+    except Exception as e:
+        print(f"[{ativo}] Erro ao processar: {e}")
+        return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
 # Gráfico de payoff
 # ---------------------------------------------------------------------------
 
