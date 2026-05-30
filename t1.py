@@ -9,9 +9,9 @@ ATIVO = "IBIT"
 # Preço médio de aquisição da ação (opcional).
 # Preencher se quiser que o gráfico de payoff reflita o custo real da posição.
 # Se None, o gráfico usa o preço atual de mercado como referência.
-PRECO_MEDIO_AQUISICAO = None   # ex: 55.00
+PRECO_MEDIO_AQUISICAO = 45.49   # ex: 55.00
 
-PROB_EXERC_MAX = 0.15         # probabilidade máxima de exercício aceita pelo usuário
+PROB_EXERC_MAX = 0.15          # probabilidade máxima de exercício aceita pelo usuário
 TAXA_LIVRE_RISCO = 0.045       # taxa anual
 DIVIDEND_YIELD = 0.00          # dividend yield anual
 
@@ -30,6 +30,10 @@ DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e ren
 MODO_OFFLINE = False
 SALVAR_MOCK  = False
 PASTA_MOCK   = "."
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+GERAR_GRAFICO_PAYOFF = False  # gerar gráfico de payoff para a melhor opção de venda de call
 # ---------------------------------------------------------------------------
 
 MIN_DIAS = 7
@@ -58,7 +62,7 @@ df_calls = fn.preparar_calls_para_modelo(
     dividend_yield=DIVIDEND_YIELD,
     usar_premio=USAR_PREMIO,
     mu=0.00, # depois quando tiver back-test pode testar usar retorno_historico_anualizado
-    n_simulacoes=50000,
+    n_simulacoes=500000,
     seed=42,
     batch_size=500,
     t_min=MIN_DIAS,
@@ -92,20 +96,19 @@ df_calls_ajustado = df_calls[
     ]
 ].copy()
 
+# Custos por ação (contrato = TAMANHO_CONTRATO ações)
+custo_venda_por_acao = CUSTO_VENDA / TAMANHO_CONTRATO
+custo_exercicio_por_acao = CUSTO_EXERCICIO / TAMANHO_CONTRATO
+
 df_calls_ajustado["preco_atual"] = preco_atual
 df_calls_ajustado["rendimento"] = df_calls_ajustado["premio"] / preco_atual
 df_calls_ajustado["distancia_strike_pct"] = df_calls["distancia_strike_pct"]
 df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
 
-# Custos por ação (contrato = TAMANHO_CONTRATO ações)
-custo_venda_por_acao = CUSTO_VENDA / TAMANHO_CONTRATO
-custo_exercicio_por_acao = CUSTO_EXERCICIO / TAMANHO_CONTRATO
-
 df_calls_ajustado["premio_liquido"] = df_calls_ajustado["premio"] - custo_venda_por_acao
 df_calls_ajustado["rendimento_liquido"] = df_calls_ajustado["premio_liquido"] / preco_atual
 df_calls_ajustado["retorno_anualizado_liquido"] = (
-    df_calls_ajustado["rendimento_liquido"] / df_calls_ajustado["T"]
-)
+    df_calls_ajustado["rendimento_liquido"] / df_calls_ajustado["T"])
 
 # Ranking para venda de call
 df_venda = df_calls_ajustado[
@@ -119,25 +122,29 @@ df_venda["score_venda"] = df_venda["retorno_anualizado_pct"] * (1 - df_venda["pr
 df_venda = df_venda.sort_values("score_venda", ascending=False)
 df_venda["ranking"] = range(1, len(df_venda) + 1)
 
-print(df_venda)
 df_venda.to_excel("df_calls_ajustado.xlsx", index=False)
 
 if not df_venda.empty:
-    melhor = df_venda.iloc[0]
-    prob_emp_str = f"{melhor['prob_empirica']:.2%}" if not pd.isna(melhor['prob_empirica']) else "N/A"
-    print(
-        f"\nMelhor call para vender: Strike {melhor['strike']} | "
-        f"Venc. {melhor['expiration']} | "
-        f"Score {melhor['score_venda']:.4f} | "
-        f"Prob. exercício final {melhor['prob_exercicio_final']:.2%} "
-        f"(d2={melhor['prob_exercicio']:.2%}, empírica={prob_emp_str})"
-    )
-
-    arquivo = fn.gerar_grafico_payoff_covered_call(
-        preco_atual=preco_atual,
-        strike=melhor["strike"],
-        premio=melhor["premio"],
-        expiration=melhor["expiration"],
-        preco_custo=PRECO_MEDIO_AQUISICAO,
-    )
-    print(f"Gráfico de payoff salvo em: {arquivo}")
+    for i in range(0, 3):
+        try:
+            melhor = df_venda.iloc[i]
+            prob_emp_str = f"{melhor['prob_empirica']:.2%}" if not pd.isna(melhor['prob_empirica']) else "N/A"
+            print(
+                f"\nStrike {melhor['strike']} | Premio {melhor['premio']:.2f} | "
+                f"Venc. {melhor['expiration']} | "
+                f"Prob. exercicio {melhor['prob_exercicio_final']:.2%} "
+                f"(d2={melhor['prob_exercicio']:.2%}, empirica={prob_emp_str}) | "
+                f"Retorno anualizado {melhor['retorno_anualizado_pct']:.2%} "
+            )
+        except IndexError:
+            break
+        
+    if GERAR_GRAFICO_PAYOFF:
+        arquivo = fn.gerar_grafico_payoff_covered_call(
+            preco_atual=preco_atual,
+            strike=melhor["strike"],
+            premio=melhor["premio"],
+            expiration=melhor["expiration"],
+            preco_custo=PRECO_MEDIO_AQUISICAO,
+        )
+        print(f"Grafico de payoff salvo em: {arquivo}")
