@@ -3,6 +3,39 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
+def carregar_historico_ativo(ativo, periodo="5y"):
+    ticker = yf.Ticker(ativo)
+    hist = ticker.history(period=periodo, auto_adjust=True)
+    if hist.empty:
+        return pd.Series(dtype=float)
+    return hist["Close"].dropna()
+
+
+def calcular_probabilidade_empirica_exercicio(precos, preco_atual, strike, dias_janela):
+    """
+    Calcula a frequência histórica em que o ativo teve retorno futuro
+    maior ou igual ao retorno necessário para atingir o strike.
+    """
+    if dias_janela <= 0 or preco_atual <= 0 or strike <= 0:
+        return np.nan
+    if len(precos) < 2 * dias_janela:
+        return np.nan
+    retorno_necessario = (strike / preco_atual) - 1
+    retorno_futuro = precos.shift(-dias_janela) / precos - 1
+    retorno_futuro = retorno_futuro.dropna()
+    if len(retorno_futuro) == 0:
+        return np.nan
+    return float((retorno_futuro >= retorno_necessario).mean())
+
+
+def _calcular_emp_row(historico_precos, preco_atual, strike, dias_janela):
+    prob = calcular_probabilidade_empirica_exercicio(
+        historico_precos, preco_atual, strike, dias_janela
+    )
+    usou = not np.isnan(prob) if prob is not None else False
+    return prob, usou
+
+
 def calcular_preco_atual(ativo):
     ticker = yf.Ticker(ativo)
     hist = ticker.history(period="5d")
@@ -245,7 +278,11 @@ def preparar_calls_para_modelo(
     batch_size=500,
     t_min=0,
     t_max=365,
-    dias_ano=365
+    dias_ano=365,
+    historico_precos=None,
+    usar_prob_d2=True,
+    usar_prob_mc=True,
+    usar_prob_empirica=True,
 ):
     """
     Calcula metricas de contrato uma unica vez por cadeia de opcoes.
@@ -278,26 +315,56 @@ def preparar_calls_para_modelo(
     
     df = df[(df["dias_vencimento"] >= t_min) & (df["dias_vencimento"] <= t_max)].copy()
 
-    df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
-        df["preco_atual"].to_numpy(),
-        df["strike"].to_numpy(),
-        df["T"].to_numpy(),
-        taxa_livre_risco,
-        dividend_yield,
-        df["impliedVolatility"].to_numpy()
-    )
+    if usar_prob_d2:
+        df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
+            df["preco_atual"].to_numpy(),
+            df["strike"].to_numpy(),
+            df["T"].to_numpy(),
+            taxa_livre_risco,
+            dividend_yield,
+            df["impliedVolatility"].to_numpy()
+        )
+    else:
+        df["prob_exercicio"] = np.nan
 
-    df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
-        df["preco_atual"].to_numpy(),
-        df["strike"].to_numpy(),
-        df["T"].to_numpy(),
-        mu=mu,
-        sigma=df["impliedVolatility"].to_numpy(),
-        q=dividend_yield,
-        n_simulacoes=n_simulacoes,
-        seed=seed,
-        batch_size=batch_size
-    )
+    if usar_prob_mc:
+        df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
+            df["preco_atual"].to_numpy(),
+            df["strike"].to_numpy(),
+            df["T"].to_numpy(),
+            mu=mu,
+            sigma=df["impliedVolatility"].to_numpy(),
+            q=dividend_yield,
+            n_simulacoes=n_simulacoes,
+            seed=seed,
+            batch_size=batch_size
+        )
+    else:
+        df["prob_exercicio_mc"] = np.nan
+
+    df["retorno_necessario"] = (df["strike"] / df["preco_atual"]) - 1
+    df["dias_uteis_ate_vencimento"] = df["dias_vencimento"]
+
+    if usar_prob_empirica and historico_precos is not None and len(historico_precos) > 0:
+        prob_emp_lista = []
+        usa_emp_lista = []
+        for _, row in df.iterrows():
+            dias_janela = int(row["dias_vencimento"])
+            p, usou = _calcular_emp_row(historico_precos, row["preco_atual"], row["strike"], dias_janela)
+            prob_emp_lista.append(p)
+            usa_emp_lista.append(usou)
+        df["prob_empirica"] = prob_emp_lista
+        df["usa_prob_empirica"] = usa_emp_lista
+    else:
+        df["prob_empirica"] = np.nan
+        df["usa_prob_empirica"] = False
+
+    # Probabilidade final conservadora: max(prob_d2, prob_empirica)
+    prob_d2_series = df["prob_exercicio"] if usar_prob_d2 else pd.Series(np.nan, index=df.index)
+    prob_emp_series = df["prob_empirica"]
+    df["prob_exercicio_final"] = prob_d2_series.combine(prob_emp_series, lambda a, b: (
+        max(x for x in [a, b] if pd.notna(x)) if any(pd.notna(x) for x in [a, b]) else np.nan
+    ))
 
     return df
 
