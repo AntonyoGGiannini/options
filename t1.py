@@ -23,6 +23,15 @@ PERIODO_HISTORICO  = "5y"      # período de histórico para probabilidade empí
 USAR_PREMIO = "bid"            # "bid", "ask", "lastPrice" ou "mid"
 DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e renda fixa
 
+# --- Modo offline -----------------------------------------------------------
+# MODO_OFFLINE = True  → lê dados de arquivos locais (sem internet / sem yfinance)
+# SALVAR_MOCK  = True  → ao rodar online, salva os dados para uso posterior offline
+# PASTA_MOCK          → pasta onde ficam/serão salvos os arquivos mock
+MODO_OFFLINE = False
+SALVAR_MOCK  = False
+PASTA_MOCK   = "."
+# ---------------------------------------------------------------------------
+
 #MIN_VOLUME = 100
 #MIN_OPEN_INTEREST = 100
 MIN_DIAS = 7
@@ -33,11 +42,16 @@ CUSTO_COMPRA = 0.00            # custo de compra por contrato (USD)
 CUSTO_VENDA = 0.00             # custo de venda por contrato (USD)
 CUSTO_EXERCICIO = 0.00         # custo de exercício por contrato (USD)
 
-df_calls = fn.obter_calls(ATIVO)
-
-preco_atual = fn.calcular_preco_atual(ATIVO)
-
-historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
+if MODO_OFFLINE:
+    df_calls, preco_atual, historico = fn.carregar_dados_mock(ATIVO, PASTA_MOCK)
+    if not USAR_PROB_EMPIRICA:
+        historico = None
+else:
+    df_calls = fn.obter_calls(ATIVO)
+    preco_atual = fn.calcular_preco_atual(ATIVO)
+    historico = fn.carregar_historico_ativo(ATIVO, periodo=PERIODO_HISTORICO) if USAR_PROB_EMPIRICA else None
+    if SALVAR_MOCK:
+        fn.salvar_dados_mock(ATIVO, df_calls, preco_atual, historico, PASTA_MOCK)
 
 df_calls = fn.preparar_calls_para_modelo(
     df_calls=df_calls,
