@@ -19,10 +19,10 @@ DIAS_ANO = 365                 # dias corridos; coerente com Black-Scholes e ren
 MIN_DIAS = 7
 MAX_DIAS = 45
 
-#CUSTO_ABERTURA = 1.00          # custo por contrato
-#SLIPPAGE_PREMIO = 0.02         # 2% do prêmio
-#CUSTO_FIXO_EXERCICIO = 5.00
-#CUSTO_VAR_EXERCICIO = 0.00     # percentual sobre notional em caso de exercício
+TAMANHO_CONTRATO = 100         # unidades por contrato (padrão EUA)
+CUSTO_COMPRA = 1.00            # custo de compra por contrato (USD)
+CUSTO_VENDA = 1.00             # custo de venda por contrato (USD)
+CUSTO_EXERCICIO = 5.00         # custo de exercício por contrato (USD)
 
 df_calls = fn.obter_calls(ATIVO)
 
@@ -62,6 +62,16 @@ df_calls_ajustado["preco_atual"] = preco_atual
 df_calls_ajustado["rendimento"] = df_calls_ajustado["premio"] / preco_atual
 df_calls_ajustado["distancia_strike_pct"] = df_calls["distancia_strike_pct"]
 df_calls_ajustado["retorno_anualizado_pct"] = df_calls["retorno_anualizado_pct"]
+
+# Custos por ação (contrato = TAMANHO_CONTRATO ações)
+custo_venda_por_acao = CUSTO_VENDA / TAMANHO_CONTRATO
+custo_exercicio_por_acao = CUSTO_EXERCICIO / TAMANHO_CONTRATO
+
+df_calls_ajustado["premio_liquido"] = df_calls_ajustado["premio"] - custo_venda_por_acao
+df_calls_ajustado["rendimento_liquido"] = df_calls_ajustado["premio_liquido"] / preco_atual
+df_calls_ajustado["retorno_anualizado_liquido"] = (
+    df_calls_ajustado["rendimento_liquido"] / df_calls_ajustado["T"]
+)
 
 # Ranking para venda de call
 df_venda = df_calls_ajustado[
