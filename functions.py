@@ -14,11 +14,6 @@ def calcular_preco_atual(ativo):
 
     return float(preco_atual)
 
-def obter_historico_precos(ativo, periodo="5y"):
-    ticker = yf.Ticker(ativo)
-    hist = ticker.history(period=periodo, auto_adjust=True)
-    return hist["Close"].dropna()
-
 def calcular_dias_ate_vencimento(expiration):
     hoje = pd.Timestamp.today().normalize()
     venc = pd.to_datetime(expiration).normalize()
@@ -238,41 +233,6 @@ def calcular_premio_vetor(df, usar_premio):
 
     raise ValueError("USAR_PREMIO deve ser: bid, ask, lastPrice ou mid")
 
-def calcular_probabilidade_empirica_exercicio(precos, preco_atual, strike, dias_janela, min_amostras=30):
-    """
-    Calcula a frequência histórica em que o ativo teve retorno futuro
-    maior ou igual ao retorno necessário para atingir o strike.
-    """
-    retorno_necessario = (strike / preco_atual) - 1
-    retornos_futuros = precos.shift(-dias_janela) / precos - 1
-    retornos_validos = retornos_futuros.dropna()
-    if len(retornos_validos) < min_amostras:
-        return np.nan, False
-    prob = float((retornos_validos >= retorno_necessario).mean())
-    return prob, True
-
-def calcular_probabilidade_empirica_batch(precos, preco_atual_arr, strike_arr, dias_janela_arr, min_amostras=30):
-    """
-    Versão vetorizada: agrupa por janela única para reutilizar os retornos futuros
-    entre opções do mesmo vencimento.
-    """
-    n = len(strike_arr)
-    probs = np.full(n, np.nan, dtype=float)
-    usa_empirica = np.zeros(n, dtype=bool)
-
-    for janela in np.unique(dias_janela_arr):
-        mask = dias_janela_arr == janela
-        retornos_futuros = precos.shift(-int(janela)) / precos - 1
-        retornos_validos = retornos_futuros.dropna()
-        if len(retornos_validos) < min_amostras:
-            continue
-        for i in np.where(mask)[0]:
-            ret_nec = (strike_arr[i] / preco_atual_arr[i]) - 1
-            probs[i] = float((retornos_validos >= ret_nec).mean())
-            usa_empirica[i] = True
-
-    return probs, usa_empirica
-
 def preparar_calls_para_modelo(
     df_calls,
     preco_atual,
@@ -285,9 +245,7 @@ def preparar_calls_para_modelo(
     batch_size=500,
     t_min=0,
     t_max=365,
-    dias_ano=365,
-    historico_precos=None,
-    min_amostras_empirica=30,
+    dias_ano=365
 ):
     """
     Calcula metricas de contrato uma unica vez por cadeia de opcoes.
@@ -306,27 +264,21 @@ def preparar_calls_para_modelo(
         pd.to_datetime(df["expiration"]).dt.normalize()
         - pd.Timestamp.today().normalize()
     ).dt.days
-
-    hoje = pd.Timestamp.today().normalize().date()
-    df["dias_uteis_ate_vencimento"] = df["expiration"].apply(
-        lambda x: int(np.busday_count(hoje, pd.Timestamp(x).date()))
-    )
-
     df["T"] = df["dias_vencimento"] / dias_ano
     df["premio"] = calcular_premio_vetor(df, usar_premio)
 
     df["distancia_strike_pct"] = (df["strike"] / df["preco_atual"]) - 1
-    df["retorno_necessario"] = df["distancia_strike_pct"]
     df["retorno_premio_pct"] = df["premio"] / df["preco_atual"]
     df["retorno_anualizado_pct"] = df["retorno_premio_pct"] * (
         dias_ano / df["dias_vencimento"]
     )
-
+    
+    df["preco_atual"] = preco_atual
     df["rendimento"] = df["premio"] / preco_atual
-
+    
     df = df[(df["dias_vencimento"] >= t_min) & (df["dias_vencimento"] <= t_max)].copy()
 
-    df["prob_d2"] = calcular_prob_exercicio_risk_neutral_vetor(
+    df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
         df["preco_atual"].to_numpy(),
         df["strike"].to_numpy(),
         df["T"].to_numpy(),
@@ -345,27 +297,6 @@ def preparar_calls_para_modelo(
         n_simulacoes=n_simulacoes,
         seed=seed,
         batch_size=batch_size
-    )
-
-    if historico_precos is not None:
-        probs_emp, usa_emp = calcular_probabilidade_empirica_batch(
-            historico_precos,
-            df["preco_atual"].to_numpy(),
-            df["strike"].to_numpy(),
-            df["dias_uteis_ate_vencimento"].to_numpy(),
-            min_amostras=min_amostras_empirica,
-        )
-        df["prob_empirica"] = probs_emp
-        df["usa_prob_empirica"] = usa_emp
-    else:
-        df["prob_empirica"] = np.nan
-        df["usa_prob_empirica"] = False
-
-    df["prob_exercicio_final"] = df["prob_d2"]
-    mascara = df["usa_prob_empirica"] & df["prob_empirica"].notna()
-    df.loc[mascara, "prob_exercicio_final"] = np.maximum(
-        df.loc[mascara, "prob_d2"],
-        df.loc[mascara, "prob_empirica"],
     )
 
     return df
