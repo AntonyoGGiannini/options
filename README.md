@@ -90,7 +90,7 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 | `top_n` | `5` | Top N opções por ativo |
 | `prob_exerc_max` | `0.15` | Probabilidade máxima de exercício aceita |
 | `taxa_livre_risco` | `0.045` | Taxa livre de risco anual |
-| `dividend_yield` | `0.00` | Dividend yield anual |
+| `dividend_yield` | `0.00` | Dividend yield anual (valor único ou por ativo via tabela `[dividend_yield]`) |
 | `usar_premio` | `"bid"` | Preço do prêmio: `bid`, `ask`, `lastPrice` ou `mid` |
 | `dias_ano` | `365` | Convenção de anualização (dias corridos) |
 | `min_dias` / `max_dias` | `7` / `20` | Faixa de prazo até vencimento (dias) |
@@ -105,31 +105,32 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 
 ## Output
 
-Gera `df_calls_ajustado.xlsx` com as colunas:
+Gera `top_opcoes_covered_call.xlsx` (configurável em `arquivo_excel`) com o
+ranking das melhores covered calls por ativo. Principais colunas:
 
 | Coluna | Descrição |
 |---|---|
-| `expiration` | Data de vencimento |
+| `ativo` | Ticker |
+| `ranking_ativo` | Posição dentro do ativo (1 = melhor) |
 | `strike` | Strike da opção |
-| `T` | Prazo em anos |
+| `premio` | Prêmio por ação (conforme `usar_premio`) |
+| `expiration` | Data de vencimento |
 | `dias_uteis_ate_vencimento` | Pregões até o vencimento |
-| `bid` / `ask` / `lastPrice` | Preços de mercado |
-| `volume` / `openInterest` | Liquidez |
-| `premio` | Prêmio bruto por ação |
-| `premio_liquido` | Prêmio líquido após custo de venda |
-| `impliedVolatility` | Volatilidade implícita |
-| `retorno_necessario` | Retorno necessário para atingir o strike |
-| `prob_d2` | Probabilidade Black-Scholes |
+| `prob_exercicio` | Probabilidade Black-Scholes (d2) |
 | `prob_empirica` | Probabilidade histórica empírica |
-| `usa_prob_empirica` | Se há histórico suficiente para a prob empírica |
-| `prob_exercicio_final` | Probabilidade conservadora final |
-| `prob_exercicio_mc` | Probabilidade Monte Carlo |
-| `rendimento_liquido` | Yield líquido sobre o preço atual |
-| `retorno_anualizado_liquido` | Retorno anualizado líquido |
+| `prob_exercicio_final` | Probabilidade conservadora final `max(d2, empírica)` |
+| `delta` / `theta` / `vega` | Greeks do contrato |
+| `fonte_vol` | `implicita` ou `historica` (fallback de volatilidade) |
+| `risco_atribuicao_antecipada` | Flag de exercício antecipado (dividendo + delta alto) |
+| `retorno_anualizado_pct` | Retorno anualizado bruto do prêmio |
+| `retorno_anualizado_liquido` | Retorno anualizado líquido de custos |
+| `bid` / `ask` | Preços de mercado |
+| `volume` / `openInterest` | Liquidez |
+| `preco_atual_ativo` | Preço atual do ativo |
 | `score_venda` | Score de ranking |
-| `ranking` | Posição (1 = melhor) |
 
-O terminal imprime o resumo da melhor call encontrada.
+O terminal imprime a tabela e o resumo da melhor call geral, e um gráfico de
+payoff (`payoff_<ATIVO>.png`) é gerado para a melhor opção.
 
 ---
 
@@ -138,9 +139,10 @@ O terminal imprime o resumo da melhor call encontrada.
 ```
 options/
 ├── config.py            # Config declarativa (TOML) com validação
-├── runner.py            # Orquestração de alto nível
+├── runner.py            # Orquestração de alto nível (run e backtest)
 ├── ranking.py           # Filtros + score + top-N
 ├── report.py            # Saída: tabela, Excel e gráfico
+├── backtest.py          # Backtest da covered call sobre o histórico
 ├── cli.py               # Interface de linha de comando
 ├── logging_setup.py     # Logging estruturado
 ├── data/                # Provedores de dados intercambiáveis
@@ -150,14 +152,16 @@ options/
 │   ├── cache.py         # cache em disco (parquet) com TTL
 │   └── retry.py         # backoff exponencial
 └── models/              # Núcleo quantitativo
-    ├── black_scholes.py # prob d2 (risk-neutral)
+    ├── black_scholes.py # prob d2 (risk-neutral) e preço da call
     ├── monte_carlo.py   # prob Monte Carlo (batch)
     ├── empirical.py     # prob empírica histórica
+    ├── greeks.py        # delta, gamma, vega, theta, rho
+    ├── volatility.py    # volatilidade realizada (fallback de IV)
     ├── pipeline.py      # métricas por cadeia de opções
     └── payoff.py        # gráfico de payoff
 
 config.toml              # Configuração da execução
-tests/                   # Suíte pytest (modelos, config, pipeline e2e)
+tests/                   # Suíte pytest (modelos, greeks, backtest, e2e)
 t1.py / functions.py     # Shims de compatibilidade retroativa
 ```
 
