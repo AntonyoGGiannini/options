@@ -28,7 +28,8 @@ class Config:
     # --- risco / mercado ---
     prob_exerc_max: float = 0.15
     taxa_livre_risco: float = 0.045
-    dividend_yield: float = 0.0
+    # float único para todos os ativos, ou dict {ativo: yield}
+    dividend_yield: float | dict[str, float] = 0.0
 
     # --- modelos de probabilidade ---
     usar_prob_d2: bool = True
@@ -77,7 +78,10 @@ class Config:
             raise ValueError("prob_exerc_max deve estar em [0, 1]")
         if self.taxa_livre_risco < 0:
             raise ValueError("taxa_livre_risco não pode ser negativa")
-        if self.dividend_yield < 0:
+        if isinstance(self.dividend_yield, dict):
+            if any(v < 0 for v in self.dividend_yield.values()):
+                raise ValueError("dividend_yield não pode ser negativo")
+        elif self.dividend_yield < 0:
             raise ValueError("dividend_yield não pode ser negativo")
         if self.usar_premio not in {"bid", "ask", "lastPrice", "mid"}:
             raise ValueError("usar_premio deve ser: bid, ask, lastPrice ou mid")
@@ -112,6 +116,12 @@ class Config:
         with caminho.open("rb") as f:
             dados = tomllib.load(f)
         return cls.from_dict(dados)
+
+    def dividend_para(self, ativo: str) -> float:
+        """Resolve o dividend yield de um ativo (suporta valor único ou por ativo)."""
+        if isinstance(self.dividend_yield, dict):
+            return float(self.dividend_yield.get(ativo, 0.0))
+        return float(self.dividend_yield)
 
     def aplicar_overrides(self, **kwargs: Any) -> Config:
         """Retorna uma nova Config com os campos não-None sobrescritos."""

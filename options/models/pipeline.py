@@ -7,7 +7,9 @@ import pandas as pd
 
 from options.models.black_scholes import calcular_prob_exercicio_risk_neutral_vetor
 from options.models.empirical import calcular_probabilidade_empirica_batch
+from options.models.greeks import calcular_greeks_call
 from options.models.monte_carlo import calcular_prob_acima_strike_monte_carlo_batch
+from options.models.volatility import volatilidade_realizada
 
 
 def calcular_premio_vetor(df, usar_premio):
@@ -79,12 +81,23 @@ def preparar_calls_para_modelo(
 
     df = df[(df["dias_vencimento"] >= t_min) & (df["dias_vencimento"] <= t_max)].copy()
 
+    # --- volatilidade efetiva: IV implícita com fallback para vol histórica ---
+    iv = df["impliedVolatility"].to_numpy(dtype=float)
+    iv_valida = np.isfinite(iv) & (iv > 0)
+    vol_hist = (
+        volatilidade_realizada(historico_precos)
+        if historico_precos is not None and len(historico_precos) > 0
+        else np.nan
+    )
+    iv_usada = np.where(iv_valida, iv, vol_hist)
+    df["iv_usada"] = iv_usada
+    df["fonte_vol"] = np.where(iv_valida, "implicita", "historica")
+
     # --- prob_exercicio (d2 / risk-neutral) ---
     if usar_prob_d2:
         df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
             df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
-            df["T"].to_numpy(), taxa_livre_risco, dividend_yield,
-            df["impliedVolatility"].to_numpy()
+            df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada
         )
     else:
         df["prob_exercicio"] = np.nan
@@ -93,13 +106,28 @@ def preparar_calls_para_modelo(
     if usar_prob_mc:
         df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
             df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
-            df["T"].to_numpy(), mu=mu,
-            sigma=df["impliedVolatility"].to_numpy(),
+            df["T"].to_numpy(), mu=mu, sigma=iv_usada,
             q=dividend_yield, n_simulacoes=n_simulacoes,
             seed=seed, batch_size=batch_size
         )
     else:
         df["prob_exercicio_mc"] = np.nan
+
+    # --- Greeks (Black-Scholes) ---
+    greeks = calcular_greeks_call(
+        df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
+        df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada,
+    )
+    df["delta"] = greeks["delta"]
+    df["gamma"] = greeks["gamma"]
+    df["vega"] = greeks["vega"]
+    df["theta"] = greeks["theta"]
+    df["rho"] = greeks["rho"]
+
+    # --- risco de atribuição antecipada (heurística) ---
+    # Calls americanas com dividendo (q>0) e delta alto têm risco de exercício
+    # antecipado próximo à data ex-dividendo.
+    df["risco_atribuicao_antecipada"] = (dividend_yield > 0) & (df["delta"] >= 0.70)
 
     # --- prob_empirica (histórico) ---
     if usar_prob_empirica and historico_precos is not None and len(historico_precos) > 0:

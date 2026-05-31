@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from options.backtest import backtest_covered_call
 from options.config import Config
 from options.data.base import ProvedorDados
 from options.data.cache import CacheDisco
@@ -65,3 +66,38 @@ def executar_e_reportar(config: Config, provedor: ProvedorDados | None = None) -
     salvar_excel(df_output, config.arquivo_excel)
     gerar_grafico_melhor(df_final, config)
     return df_final
+
+
+def executar_backtest(
+    config: Config,
+    distancia_strike_pct: float = 0.05,
+    dias_vencimento: int = 14,
+    janela_vol: int = 60,
+    provedor: ProvedorDados | None = None,
+) -> pd.DataFrame:
+    """Roda o backtest de covered call para cada ativo e retorna os resumos."""
+    if provedor is None:
+        provedor = construir_provedor(config)
+
+    resumos = []
+    for ativo in config.lista_ativos:
+        try:
+            dados = provedor.obter(ativo, config.periodo_historico)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("[%s] Erro ao obter histórico para backtest: %s", ativo, exc)
+            continue
+        if dados.historico_precos is None or len(dados.historico_precos) <= janela_vol + dias_vencimento:
+            logger.info("[%s] Histórico insuficiente para backtest.", ativo)
+            continue
+        _, resumo = backtest_covered_call(
+            dados.historico_precos,
+            ativo=ativo,
+            distancia_strike_pct=distancia_strike_pct,
+            dias_vencimento=dias_vencimento,
+            taxa_livre_risco=config.taxa_livre_risco,
+            dividend_yield=config.dividend_para(ativo),
+            janela_vol=janela_vol,
+        )
+        resumos.append(resumo.as_dict())
+
+    return pd.DataFrame(resumos)

@@ -17,6 +17,12 @@ Para cada call disponível no mercado, o modelo calcula:
 
 3. **Score de ranking**: `retorno_anualizado_liquido × (1 - prob_exercicio_final)`
 
+Para cada contrato também são calculados os **Greeks** (delta, gamma, vega,
+theta, rho). Quando a volatilidade implícita está ausente/inválida, usa-se a
+**volatilidade realizada** histórica como fallback (`fonte_vol`). O
+`dividend_yield` pode ser único ou **por ativo**, e contratos com dividendo e
+delta alto recebem flag de **risco de atribuição antecipada**.
+
 Filtros aplicados antes do ranking:
 - Apenas calls OTM (strike acima do preço atual)
 - `prob_exercicio_final ≤ PROB_EXERC_MAX`
@@ -62,6 +68,19 @@ O entrypoint legado continua funcionando (carrega `config.toml` automaticamente)
 ```bash
 python3 t1.py
 ```
+
+### Backtest
+
+Valida a metodologia de seleção de strike sobre o histórico de preços. O prêmio
+é estimado por Black-Scholes com a **volatilidade realizada** de cada data
+(backtest baseado em modelo — não usa cadeias de opções históricas):
+
+```bash
+options --config config.toml backtest --distancia 0.05 --dias 14
+```
+
+Reporta, por ativo: nº de trades, retorno médio/anualizado da covered call,
+taxa de exercício, taxa de acerto e comparação com buy & hold.
 
 ### Parâmetros configuráveis (`config.toml`)
 

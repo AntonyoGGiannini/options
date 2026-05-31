@@ -32,8 +32,13 @@ def test_pipeline_produz_colunas_esperadas(dados_ibit):
         historico_precos=dados_ibit.historico_precos,
     )
     for col in ["prob_exercicio", "prob_exercicio_mc", "prob_empirica",
-                "prob_exercicio_final", "premio", "T"]:
+                "prob_exercicio_final", "premio", "T",
+                "delta", "gamma", "vega", "theta", "iv_usada", "fonte_vol",
+                "risco_atribuicao_antecipada"]:
         assert col in df.columns
+    # Delta de calls OTM deve estar em (0, 1).
+    deltas = df["delta"].dropna()
+    assert ((deltas > 0) & (deltas < 1)).all()
     # prob_exercicio_final >= prob_exercicio onde a empírica é usada (conservador)
     mask = df["usa_prob_empirica"] & df["prob_empirica"].notna()
     assert (df.loc[mask, "prob_exercicio_final"] >= df.loc[mask, "prob_exercicio"] - 1e-9).all()
