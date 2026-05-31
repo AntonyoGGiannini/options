@@ -1,0 +1,54 @@
+# Configuração da análise de covered calls.
+# Rode com: options --config config.toml   (ou)   python3 t1.py
+
+# --- universo ---
+lista_ativos = ["IBIT", "AAPL", "IVV", "NVDA", "SPY", "META",
+                "AMZN", "GOOGL", "TSLA", "MSFT", "TFLO", "AGG",
+                "USFR", "REMX", "NU", "TSM", "GLD", "AVEM",
+                "VPL", "BBEU"]
+top_n = 5
+
+# --- risco / mercado ---
+prob_exerc_max   = 0.15
+taxa_livre_risco = 0.045
+dividend_yield   = 0.00
+
+# --- modelos de probabilidade ---
+usar_prob_d2       = true
+usar_prob_mc       = true
+usar_prob_empirica = true
+periodo_historico  = "5y"
+min_amostras_empirica = 30
+mu            = 0.0
+n_simulacoes  = 50000
+seed          = 42
+batch_size    = 500
+
+# --- prêmio / convenção ---
+usar_premio = "bid"   # bid | ask | lastPrice | mid
+dias_ano    = 365
+min_dias    = 7
+max_dias    = 20
+
+# --- custos (USD por contrato) ---
+tamanho_contrato = 100
+custo_compra     = 0.00
+custo_venda      = 0.00
+custo_exercicio  = 0.00
+
+# --- dados ---
+modo_offline   = false
+salvar_mock    = false
+pasta_mock     = "."
+usar_cache     = true
+cache_ttl_horas = 6.0
+pasta_cache    = ".cache"
+
+# --- saída ---
+arquivo_excel = "top_opcoes_covered_call.xlsx"
+
+# Preço médio de aquisição (opcional, usado só no gráfico de payoff).
+# Exemplo:
+# [preco_medio_aquisicao]
+# IBIT = 55.00
+# AAPL = 180.00

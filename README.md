@@ -28,39 +28,59 @@ Filtros aplicados antes do ranking:
 ## Instalação
 
 ```bash
+pip install -e .          # instala o pacote e o comando `options`
+# ou, só as dependências de runtime:
 pip install -r requirements.txt
 ```
 
-Dependências: `pandas`, `numpy`, `scipy`, `yfinance`
+Para desenvolvimento (testes, lint, type-check):
+
+```bash
+pip install -e ".[dev]"
+```
 
 ---
 
 ## Uso
 
-Edite as constantes no topo de `t1.py` e execute:
+A configuração é **declarativa**, em `config.toml`. Edite o arquivo e rode via CLI:
+
+```bash
+options --config config.toml
+```
+
+Overrides rápidos pela linha de comando:
+
+```bash
+options --config config.toml --ativos IBIT,AAPL --top-n 3
+options --offline                 # usa dados mock locais (sem internet)
+options --config config.toml --sem-cache -v
+```
+
+O entrypoint legado continua funcionando (carrega `config.toml` automaticamente):
 
 ```bash
 python3 t1.py
 ```
 
-### Parâmetros configuráveis
+### Parâmetros configuráveis (`config.toml`)
 
 | Parâmetro | Padrão | Descrição |
 |---|---|---|
-| `ATIVO` | `"IBIT"` | Ticker do ativo |
-| `PROB_EXERC_MAX` | `0.80` | Probabilidade máxima de exercício aceita |
-| `TAXA_LIVRE_RISCO` | `0.045` | Taxa livre de risco anual |
-| `DIVIDEND_YIELD` | `0.00` | Dividend yield anual |
-| `USAR_PREMIO` | `"bid"` | Preço do prêmio: `bid`, `ask`, `lastPrice` ou `mid` |
-| `DIAS_ANO` | `365` | Convenção de anualização (dias corridos) |
-| `MIN_DIAS` | `7` | Prazo mínimo até vencimento (dias) |
-| `MAX_DIAS` | `45` | Prazo máximo até vencimento (dias) |
-| `PERIODO_HISTORICO` | `"5y"` | Janela de histórico para probabilidade empírica |
-| `MIN_AMOSTRAS_EMPIRICA` | `30` | Mínimo de amostras para ativar prob empírica |
-| `TAMANHO_CONTRATO` | `100` | Ações por contrato |
-| `CUSTO_COMPRA` | `1.00` | Custo de compra por contrato (USD) |
-| `CUSTO_VENDA` | `1.00` | Custo de venda por contrato (USD) |
-| `CUSTO_EXERCICIO` | `5.00` | Custo de exercício por contrato (USD) |
+| `lista_ativos` | `["IBIT", ...]` | Tickers a analisar |
+| `top_n` | `5` | Top N opções por ativo |
+| `prob_exerc_max` | `0.15` | Probabilidade máxima de exercício aceita |
+| `taxa_livre_risco` | `0.045` | Taxa livre de risco anual |
+| `dividend_yield` | `0.00` | Dividend yield anual |
+| `usar_premio` | `"bid"` | Preço do prêmio: `bid`, `ask`, `lastPrice` ou `mid` |
+| `dias_ano` | `365` | Convenção de anualização (dias corridos) |
+| `min_dias` / `max_dias` | `7` / `20` | Faixa de prazo até vencimento (dias) |
+| `periodo_historico` | `"5y"` | Janela de histórico para probabilidade empírica |
+| `min_amostras_empirica` | `30` | Mínimo de amostras para ativar prob empírica |
+| `tamanho_contrato` | `100` | Ações por contrato |
+| `custo_compra` / `custo_venda` / `custo_exercicio` | `0.00` | Custos por contrato (USD) |
+| `usar_cache` / `cache_ttl_horas` | `true` / `6.0` | Cache em disco dos dados de mercado |
+| `modo_offline` / `salvar_mock` | `false` | Usar/gerar dados mock locais |
 
 ---
 
@@ -97,21 +117,43 @@ O terminal imprime o resumo da melhor call encontrada.
 ## Estrutura
 
 ```
-Options2/
-├── t1.py           # Configuração e execução principal
-├── functions.py    # Modelos e funções de cálculo
-├── requirements.txt
-└── README.md
+options/
+├── config.py            # Config declarativa (TOML) com validação
+├── runner.py            # Orquestração de alto nível
+├── ranking.py           # Filtros + score + top-N
+├── report.py            # Saída: tabela, Excel e gráfico
+├── cli.py               # Interface de linha de comando
+├── logging_setup.py     # Logging estruturado
+├── data/                # Provedores de dados intercambiáveis
+│   ├── base.py          #   interface ProvedorDados + DadosMercado
+│   ├── yfinance_provider.py  # online, com cache e retry
+│   ├── mock_provider.py # offline (CSV/JSON)
+│   ├── cache.py         # cache em disco (parquet) com TTL
+│   └── retry.py         # backoff exponencial
+└── models/              # Núcleo quantitativo
+    ├── black_scholes.py # prob d2 (risk-neutral)
+    ├── monte_carlo.py   # prob Monte Carlo (batch)
+    ├── empirical.py     # prob empírica histórica
+    ├── pipeline.py      # métricas por cadeia de opções
+    └── payoff.py        # gráfico de payoff
+
+config.toml              # Configuração da execução
+tests/                   # Suíte pytest (modelos, config, pipeline e2e)
+t1.py / functions.py     # Shims de compatibilidade retroativa
 ```
 
-### Funções principais em `functions.py`
+### Desenvolvimento
 
-| Função | Descrição |
-|---|---|
-| `obter_calls(ativo)` | Busca cadeia de opções via yfinance com filtros de liquidez |
-| `calcular_preco_atual(ativo)` | Preço atual via yfinance |
-| `obter_historico_precos(ativo, periodo)` | Histórico de preços ajustados |
-| `preparar_calls_para_modelo(...)` | Pipeline completo de cálculo por ativo |
-| `calcular_prob_exercicio_risk_neutral_vetor(...)` | Black-Scholes vetorizado |
-| `calcular_prob_acima_strike_monte_carlo_batch(...)` | Monte Carlo em batch |
-| `calcular_probabilidade_empirica_batch(...)` | Probabilidade histórica vetorizada |
+```bash
+pytest            # testes
+ruff check .      # lint
+mypy options      # type-check
+```
+
+CI no GitHub Actions roda lint + mypy + testes em cada PR (Python 3.11 e 3.12).
+
+### Arquitetura
+
+A camada de dados é abstraída pela interface `ProvedorDados`, permitindo trocar
+yfinance, dados mock ou qualquer outra fonte sem alterar os modelos ou o ranking.
+O provedor online aplica cache em disco (TTL) e retry com backoff exponencial.

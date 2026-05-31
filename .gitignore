@@ -8,3 +8,7 @@ dist/
 build/
 .env
 *.xlsx
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
