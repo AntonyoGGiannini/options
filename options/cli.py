@@ -8,7 +8,7 @@ import sys
 
 from options.config import Config
 from options.logging_setup import configurar_logging, obter_logger
-from options.runner import executar_e_reportar
+from options.runner import executar_backtest, executar_e_reportar
 
 logger = obter_logger(__name__)
 
@@ -43,6 +43,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "-v", "--verbose", action="store_true",
         help="Logging em nível DEBUG.",
     )
+
+    sub = parser.add_subparsers(dest="comando")
+    parser.set_defaults(comando="run")
+
+    bt = sub.add_parser("backtest", help="Backtest da estratégia sobre o histórico.")
+    bt.add_argument("--distancia", type=float, default=0.05,
+                    help="Distância do strike OTM (ex.: 0.05 = 5%% acima).")
+    bt.add_argument("--dias", type=int, default=14,
+                    help="Horizonte até o vencimento, em pregões.")
+    bt.add_argument("--janela-vol", type=int, default=60,
+                    help="Janela (pregões) da volatilidade realizada.")
+
     return parser.parse_args(argv)
 
 
@@ -70,6 +82,22 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError) as exc:
         logger.error("Configuração inválida: %s", exc)
         return 2
+
+    if args.comando == "backtest":
+        df = executar_backtest(
+            config,
+            distancia_strike_pct=args.distancia,
+            dias_vencimento=args.dias,
+            janela_vol=args.janela_vol,
+        )
+        if df.empty:
+            logger.warning("Backtest não produziu resultados.")
+            return 1
+        print("\n" + "=" * 80)
+        print(f"BACKTEST COVERED CALL | distância {args.distancia:.0%} | {args.dias} pregões")
+        print("=" * 80)
+        print(df.to_string(index=False))
+        return 0
 
     df_final = executar_e_reportar(config)
     return 0 if not df_final.empty else 1

@@ -11,6 +11,8 @@ top_n = 5
 # --- risco / mercado ---
 prob_exerc_max   = 0.15
 taxa_livre_risco = 0.045
+# dividend_yield: valor único para todos os ativos (abaixo) OU por ativo,
+# usando a tabela [dividend_yield] no fim deste arquivo.
 dividend_yield   = 0.00
 
 # --- modelos de probabilidade ---
@@ -52,3 +54,9 @@ arquivo_excel = "top_opcoes_covered_call.xlsx"
 # [preco_medio_aquisicao]
 # IBIT = 55.00
 # AAPL = 180.00
+
+# Dividend yield por ativo (opcional). Se presente, sobrescreve o valor único
+# acima e deixa de usá-lo. Ativos não listados assumem 0.0.
+# [dividend_yield]
+# AAPL = 0.005
+# SPY  = 0.013

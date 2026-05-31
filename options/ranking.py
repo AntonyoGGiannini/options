@@ -68,7 +68,7 @@ def processar_ativo(
             df_calls=dados.df_calls,
             preco_atual=dados.preco_atual,
             taxa_livre_risco=config.taxa_livre_risco,
-            dividend_yield=config.dividend_yield,
+            dividend_yield=config.dividend_para(ativo),
             usar_premio=config.usar_premio,
             mu=config.mu,
             n_simulacoes=config.n_simulacoes,

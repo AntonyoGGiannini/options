@@ -45,63 +45,59 @@ entregáveis e critérios de pronto, partindo do estado atual do código.
 
 ## 3. Roadmap por fases
 
-### Fase 0 — Fundação de engenharia (1–2 semanas)
+### Fase 0 — Fundação de engenharia ✅ concluída
 **Objetivo:** criar a rede de segurança antes de qualquer refatoração.
 
-- [ ] `pyproject.toml` (packaging, ruff, mypy, pytest configurados).
-- [ ] Suíte de **testes unitários** dos modelos usando os mocks já existentes:
+- [x] `pyproject.toml` (packaging, ruff, mypy, pytest configurados).
+- [x] Suíte de **testes unitários** dos modelos usando os mocks já existentes:
   - `prob d2` contra valores analíticos conhecidos;
   - Monte Carlo convergindo para `d2` quando `mu = r`;
   - empírica contra um histórico sintético controlado;
-  - pipeline `preparar_calls_para_modelo` com snapshot do output mock.
-- [ ] `ruff` (lint + format) e `mypy` em modo gradual.
-- [ ] **CI no GitHub Actions**: lint + mypy + testes em cada PR.
-- [ ] Logging estruturado (`logging`) substituindo os `print()` da biblioteca.
+  - pipeline `preparar_calls_para_modelo` validado com os dados mock.
+- [x] `ruff` (lint + format) e `mypy`.
+- [x] **CI no GitHub Actions**: lint + mypy + testes em cada PR.
+- [x] Logging estruturado (`logging`) substituindo os `print()` da biblioteca.
 
-**Pronto quando:** `pytest` verde no CI e cobertura dos modelos numéricos.
+**Pronto:** `pytest` verde no CI e cobertura dos modelos numéricos.
 
 ---
 
-### Fase 1 — Arquitetura e configuração (1–2 semanas)
+### Fase 1 — Arquitetura e configuração ✅ concluída
 **Objetivo:** tornar o código modular e a configuração declarativa.
 
-- [ ] Reorganizar em pacote `options/`:
-  ```
-  options/
-  ├── config.py        # dataclass/pydantic com validação dos parâmetros
-  ├── data/            # providers (yfinance, mock) atrás de uma interface
-  ├── models/          # d2, monte_carlo, empirica, payoff
-  ├── ranking.py       # filtros + score + top-N
-  ├── report.py        # Excel + gráficos
-  └── cli.py           # entrypoint
-  ```
-- [ ] **Configuração via arquivo** (`config.yaml`/`.toml`) + override por CLI,
+- [x] Reorganizado em pacote `options/` (config, data, models, ranking, report,
+  runner, cli).
+- [x] **Configuração via arquivo** (`config.toml`) + override por CLI,
   substituindo as constantes de `t1.py`. Validação de tipos e faixas.
-- [ ] **CLI** (`argparse`/`typer`): `options run --config config.yaml`,
-  `--offline`, `--save-mock`, `--ativos IBIT,AAPL`.
-- [ ] Camada de **dados com cache** (parquet em disco, TTL) e retry/back-off
-  para o yfinance; interface `DataProvider` permitindo trocar a fonte.
+- [x] **CLI** (`argparse`): `options --config config.toml`, `--offline`,
+  `--salvar-mock`, `--ativos IBIT,AAPL`, `--sem-cache`.
+- [x] Camada de **dados com cache** (parquet em disco, TTL) e retry/back-off
+  para o yfinance; interface `ProvedorDados` permitindo trocar a fonte.
 
-**Pronto quando:** rodar o fluxo completo via CLI lendo um arquivo de config,
-sem editar código.
+**Pronto:** fluxo completo roda via CLI lendo o arquivo de config, sem editar
+código. Shims (`t1.py`/`functions.py`) preservam compatibilidade.
 
 ---
 
-### Fase 2 — Rigor quantitativo (2–3 semanas)
+### Fase 2 — Rigor quantitativo ✅ concluída
 **Objetivo:** aumentar a confiança nos números e no score.
 
-- [ ] **Greeks** (delta, gamma, theta, vega) por contrato — delta como proxy
-  rápido e intuitivo de probabilidade de exercício.
-- [ ] **Exercício americano / early assignment**: alerta de risco de
-  atribuição antecipada perto de ex-dividendo; dividend yield **por ativo**.
-- [ ] **Modelagem de volatilidade**: usar a IV smile/term-structure real em vez
-  de uma IV pontual; opção de vol histórica como fallback.
-- [ ] **Backtest do score**: validar se `score_venda` historicamente seleciona
-  calls com melhor retorno ajustado ao risco; reportar métricas
-  (retorno realizado, taxa de exercício, drawdown).
-- [ ] **Sensibilidade**: análise de como o ranking muda com `r`, `mu`, IV.
+- [x] **Greeks** (delta, gamma, theta, vega, rho) por contrato —
+  `options/models/greeks.py`, validados por diferenças finitas.
+- [x] **Early assignment / dividend yield por ativo**: `dividend_yield` aceita
+  valor único ou dict por ativo (`Config.dividend_para`); flag
+  `risco_atribuicao_antecipada` para calls com dividendo e delta alto.
+- [x] **Volatilidade histórica como fallback**: `options/models/volatility.py`;
+  o pipeline usa IV implícita e cai para vol realizada quando ausente
+  (coluna `fonte_vol`).
+- [x] **Backtest do score**: `options/backtest.py` + subcomando
+  `options backtest`; reporta retorno realizado, taxa de exercício, taxa de
+  acerto e comparação com buy & hold.
+- [ ] *(futuro)* IV smile/term-structure completa e análise de sensibilidade
+  multivariada de `r`/`mu`/IV.
 
-**Pronto quando:** relatório de backtest reproduzível e Greeks no output.
+**Pronto:** Greeks e flags no output, backtest reproduzível via CLI, 41 testes
+verdes.
 
 ---
 
