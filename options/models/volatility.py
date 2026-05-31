@@ -17,9 +17,11 @@ def volatilidade_realizada(precos: pd.Series, janela: int | None = None,
     """
     if precos is None or len(precos) < 3:
         return float("nan")
-    log_ret = np.log(precos / precos.shift(1)).dropna()
+    valores = precos.to_numpy(dtype=float)
+    log_ret = np.log(valores[1:] / valores[:-1])
+    log_ret = log_ret[np.isfinite(log_ret)]
     if janela is not None:
-        log_ret = log_ret.iloc[-janela:]
+        log_ret = log_ret[-janela:]
     if len(log_ret) < 2:
         return float("nan")
-    return float(log_ret.std(ddof=1) * np.sqrt(dias_ano))
+    return float(np.std(log_ret, ddof=1) * np.sqrt(dias_ano))
