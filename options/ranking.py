@@ -29,8 +29,21 @@ def rankear_calls(df: pd.DataFrame, config: Config, preco_atual: float) -> pd.Da
     if df_filtrado.empty:
         return df_filtrado
 
+    theta_eff = (
+        (-df_filtrado["theta"] / config.dias_ano)
+        / df_filtrado["premio_liquido"].clip(lower=1e-6)
+    ).clip(lower=0)
+
+    vega_risk = (
+        (df_filtrado["vega"] * 0.01)
+        / df_filtrado["premio_liquido"].clip(lower=1e-6)
+    ).clip(lower=0)
+
     df_filtrado["score_venda"] = (
-        df_filtrado["retorno_anualizado_pct"] * (1 - df_filtrado["prob_exercicio_final"])
+        df_filtrado["retorno_anualizado_pct"]
+        * (1 - df_filtrado["prob_exercicio_final"])
+        * (1 + config.peso_theta * theta_eff)
+        / (1 + config.peso_vega * vega_risk)
     )
     df_filtrado = df_filtrado.sort_values("score_venda", ascending=False)
     df_filtrado["ranking_ativo"] = range(1, len(df_filtrado) + 1)
