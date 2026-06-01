@@ -62,6 +62,10 @@ class Config:
     cache_ttl_horas: float = 6.0
     pasta_cache: str = ".cache"
 
+    # --- greeks no score ---
+    peso_theta: float = 0.0
+    peso_vega: float = 0.0
+
     # --- saída ---
     arquivo_excel: str = "top_opcoes_covered_call.xlsx"
 
@@ -97,6 +101,10 @@ class Config:
             raise ValueError("batch_size deve ser > 0")
         if self.cache_ttl_horas < 0:
             raise ValueError("cache_ttl_horas não pode ser negativo")
+        if self.peso_theta < 0:
+            raise ValueError("peso_theta não pode ser negativo")
+        if self.peso_vega < 0:
+            raise ValueError("peso_vega não pode ser negativo")
 
     @classmethod
     def from_dict(cls, dados: dict[str, Any]) -> Config:
