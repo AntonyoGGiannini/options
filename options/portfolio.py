@@ -520,15 +520,17 @@ def reportar_carteiras(
     pasta.mkdir(parents=True, exist_ok=True)
 
     caminhos: list[str] = []
-    vistos: dict[str, int] = {}
+    usados: set[str] = set()
     for i, rel in enumerate(relatorios):
         slug = _slug_cliente(rel.cliente, i)
-        # desambigua nomes repetidos (dois clientes com o mesmo nome)
-        if slug in vistos:
-            vistos[slug] += 1
-            slug = f"{slug}_{vistos[slug]}"
-        else:
-            vistos[slug] = 1
+        # desambigua usando o conjunto de slugs já emitidos (incluindo sufixos),
+        # evitando colisão quando um cliente tem nome natural igual a um sufixo gerado
+        if slug in usados:
+            n = 2
+            while f"{slug}_{n}" in usados:
+                n += 1
+            slug = f"{slug}_{n}"
+        usados.add(slug)
         caminho = str(pasta / f"analise_{slug}.xlsx")
         caminhos.append(reportar_carteira(rel, caminho))
     return caminhos
