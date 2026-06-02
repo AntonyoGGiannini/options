@@ -5,10 +5,15 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 from options.config import Config
 from options.logging_setup import configurar_logging, obter_logger
-from options.portfolio import avaliar_carteira, carregar_carteira, reportar_carteira
+from options.portfolio import (
+    avaliar_carteiras,
+    carregar_carteiras,
+    reportar_carteiras,
+)
 from options.runner import executar_backtest, executar_e_reportar
 
 logger = obter_logger(__name__)
@@ -60,11 +65,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     bt.add_argument("--janela-vol", type=int, default=60,
                     help="Janela (pregões) da volatilidade realizada.")
 
-    ca = sub.add_parser("carteira", help="Analisa a carteira de um cliente (JSON).")
+    ca = sub.add_parser("carteira", help="Analisa a carteira de um ou mais clientes (JSON).")
     ca.add_argument("--arquivo", required=True,
-                    help="Caminho do JSON com a posição do cliente.")
-    ca.add_argument("--saida", default="analise_carteira.xlsx",
-                    help="Arquivo Excel de saída (3 abas).")
+                    help="Caminho do JSON com a posição (um cliente ou um array de clientes).")
+    ca.add_argument("--saida", default=".",
+                    help="Pasta de saída; gera analise_<cliente>.xlsx por cliente.")
     ca.add_argument("--limiar-premio-restante", type=float, default=None,
                     help="Gatilho de rolagem: fração do prêmio ainda em aberto (ex.: 0.20).")
     ca.add_argument("--rolagem-min-dias", type=int, default=None,
@@ -119,19 +124,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.comando == "carteira":
         try:
-            carteira = carregar_carteira(args.arquivo)
+            carteiras = carregar_carteiras(args.arquivo)
         except (ValueError, FileNotFoundError) as exc:
             logger.error("Carteira inválida: %s", exc)
             return 2
-        # overrides CLI sobrescrevem os valores do JSON por-cliente
-        if getattr(args, "limiar_premio_restante", None) is not None:
-            carteira.limiar_premio_restante = args.limiar_premio_restante
-        if getattr(args, "rolagem_min_dias", None) is not None:
-            carteira.rolagem_min_dias = args.rolagem_min_dias
-        if getattr(args, "rolagem_max_dias", None) is not None:
-            carteira.rolagem_max_dias = args.rolagem_max_dias
-        relatorio = avaliar_carteira(carteira, config)
-        reportar_carteira(relatorio, args.saida)
+        # overrides CLI sobrescrevem os valores do JSON, para todos os clientes
+        for carteira in carteiras:
+            if getattr(args, "limiar_premio_restante", None) is not None:
+                carteira.limiar_premio_restante = args.limiar_premio_restante
+            if getattr(args, "rolagem_min_dias", None) is not None:
+                carteira.rolagem_min_dias = args.rolagem_min_dias
+            if getattr(args, "rolagem_max_dias", None) is not None:
+                carteira.rolagem_max_dias = args.rolagem_max_dias
+        # --saida pode vir como pasta ou, por compat, como nome .xlsx (usa o dir-pai)
+        saida = Path(args.saida)
+        pasta = saida.parent if saida.suffix.lower() == ".xlsx" else saida
+        relatorios = avaliar_carteiras(carteiras, config)
+        reportar_carteiras(relatorios, pasta)
         return 0
 
     df_final = executar_e_reportar(config)

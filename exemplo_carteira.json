@@ -1,20 +1,40 @@
-{
-  "cliente": "Carteira de Teste",
-  "caixa": 100000,
+[
+  {
+    "cliente": "Carteira de Teste",
+    "caixa": 100000,
 
-  "posicoes": [
-    {"ativo": "AAPL", "quantidade": 300, "preco_medio": 180.0},
-    {"ativo": "NVDA", "quantidade": 200, "preco_medio": 95.0},
-    {"ativo": "MSFT", "quantidade": 100, "preco_medio": 410.0}
-  ],
+    "posicoes": [
+      {"ativo": "AAPL", "quantidade": 300, "preco_medio": 180.0},
+      {"ativo": "NVDA", "quantidade": 200, "preco_medio": 95.0},
+      {"ativo": "MSFT", "quantidade": 100, "preco_medio": 410.0}
+    ],
 
-  "calls_vendidas": [
-    {"ativo": "AAPL", "strike": 210.0, "expiration": "2026-07-17", "premio_recebido": 3.5, "contratos": 2},
-    {"ativo": "NVDA", "strike": 125.0, "expiration": "2026-06-26", "premio_recebido": 2.0, "contratos": 1}
-  ],
+    "calls_vendidas": [
+      {"ativo": "AAPL", "strike": 210.0, "expiration": "2026-07-17", "premio_recebido": 3.5, "contratos": 2},
+      {"ativo": "NVDA", "strike": 125.0, "expiration": "2026-06-26", "premio_recebido": 2.0, "contratos": 1}
+    ],
 
-  "limiar_premio_restante": 0.20,
-  "rolagem_min_dias": 21,
-  "rolagem_max_dias": 60,
-  "permitir_strike_abaixo_custo": false
-}
+    "limiar_premio_restante": 0.20,
+    "rolagem_min_dias": 21,
+    "rolagem_max_dias": 60,
+    "permitir_strike_abaixo_custo": false
+  },
+  {
+    "cliente": "Cliente Conservador",
+    "caixa": 50000,
+
+    "posicoes": [
+      {"ativo": "IVV", "quantidade": 200, "preco_medio": 480.0},
+      {"ativo": "AGG", "quantidade": 500, "preco_medio": 98.0}
+    ],
+
+    "calls_vendidas": [
+      {"ativo": "IVV", "strike": 520.0, "expiration": "2026-07-17", "premio_recebido": 4.0, "contratos": 1}
+    ],
+
+    "limiar_premio_restante": 0.25,
+    "rolagem_min_dias": 30,
+    "rolagem_max_dias": 75,
+    "permitir_strike_abaixo_custo": false
+  }
+]

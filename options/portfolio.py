@@ -104,15 +104,47 @@ class RelatorioCarteira:
 # Carregamento do JSON                                                        #
 # --------------------------------------------------------------------------- #
 def carregar_carteira(caminho: str | Path) -> Carteira:
-    """Lê e valida uma carteira de cliente a partir de um arquivo JSON."""
+    """Lê e valida uma carteira de cliente (objeto JSON único).
+
+    Para arquivos com múltiplos clientes (array JSON), use ``carregar_carteiras``.
+    """
     caminho = Path(caminho)
     if not caminho.exists():
         raise FileNotFoundError(f"Arquivo de carteira não encontrado: {caminho}")
     with caminho.open(encoding="utf-8") as f:
-        dados: dict[str, Any] = json.load(f)
+        dados: Any = json.load(f)
 
     if not isinstance(dados, dict):
         raise ValueError("O JSON da carteira deve ser um objeto.")
+    return _parse_carteira(dados)
+
+
+def carregar_carteiras(caminho: str | Path) -> list[Carteira]:
+    """Lê um arquivo JSON com um ou vários clientes; sempre retorna uma lista.
+
+    Aceita dois formatos:
+    - **objeto único**: ``{"cliente": "Fulano", ...}`` → lista de um elemento;
+    - **array de clientes**: ``[{"cliente": "A", ...}, {"cliente": "B", ...}]``.
+    """
+    caminho = Path(caminho)
+    if not caminho.exists():
+        raise FileNotFoundError(f"Arquivo de carteira não encontrado: {caminho}")
+    with caminho.open(encoding="utf-8") as f:
+        dados: Any = json.load(f)
+
+    if isinstance(dados, dict):
+        return [_parse_carteira(dados)]
+    if isinstance(dados, list):
+        if not dados:
+            raise ValueError("O array de carteiras está vazio.")
+        return [_parse_carteira(item) for item in dados]
+    raise ValueError("O JSON da carteira deve ser um objeto ou um array de objetos.")
+
+
+def _parse_carteira(dados: dict[str, Any]) -> Carteira:
+    """Valida e converte um único objeto-cliente em ``Carteira``."""
+    if not isinstance(dados, dict):
+        raise ValueError("Cada cliente do JSON deve ser um objeto.")
 
     posicoes = [_parse_posicao(p) for p in dados.get("posicoes", [])]
     calls = [_parse_call(c) for c in dados.get("calls_vendidas", [])]
@@ -193,6 +225,17 @@ def avaliar_carteira(
         buy_write=_analisar_buy_write(carteira, config, provedor),
         cliente=carteira.cliente,
     )
+
+
+def avaliar_carteiras(
+    carteiras: list[Carteira],
+    config: Config,
+    provedor: ProvedorDados | None = None,
+) -> list[RelatorioCarteira]:
+    """Avalia vários clientes, reutilizando o mesmo provedor (e seu cache)."""
+    if provedor is None:
+        provedor = construir_provedor(config)
+    return [avaliar_carteira(c, config, provedor) for c in carteiras]
 
 
 def _analisar_covered_call(
@@ -456,3 +499,36 @@ def reportar_carteira(relatorio: RelatorioCarteira, caminho_xlsx: str) -> str:
 
     logger.info("Análise de carteira salva em: %s", caminho_xlsx)
     return caminho_xlsx
+
+
+def _slug_cliente(cliente: str | None, indice: int) -> str:
+    """Nome de arquivo seguro a partir do nome do cliente."""
+    if not cliente:
+        return f"cliente_{indice + 1}"
+    seguro = "".join(c if c.isalnum() or c in "-_" else "_" for c in cliente.strip())
+    return seguro.strip("_") or f"cliente_{indice + 1}"
+
+
+def reportar_carteiras(
+    relatorios: list[RelatorioCarteira], pasta_saida: str | Path = "."
+) -> list[str]:
+    """Gera um Excel por cliente em ``pasta_saida`` (``analise_<cliente>.xlsx``).
+
+    Imprime o resumo de cada cliente no terminal e retorna os caminhos gerados.
+    """
+    pasta = Path(pasta_saida)
+    pasta.mkdir(parents=True, exist_ok=True)
+
+    caminhos: list[str] = []
+    vistos: dict[str, int] = {}
+    for i, rel in enumerate(relatorios):
+        slug = _slug_cliente(rel.cliente, i)
+        # desambigua nomes repetidos (dois clientes com o mesmo nome)
+        if slug in vistos:
+            vistos[slug] += 1
+            slug = f"{slug}_{vistos[slug]}"
+        else:
+            vistos[slug] = 1
+        caminho = str(pasta / f"analise_{slug}.xlsx")
+        caminhos.append(reportar_carteira(rel, caminho))
+    return caminhos

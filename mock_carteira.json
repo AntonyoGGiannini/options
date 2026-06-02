@@ -1,10 +1,12 @@
-{
-  "cliente": "Cliente Exemplo",
-  "caixa": 20000,
-  "posicoes": [
-    {"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}
-  ],
-  "calls_vendidas": [
-    {"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18", "premio_recebido": 2.0, "contratos": 1}
-  ]
-}
+[
+  {
+    "cliente": "Cliente Exemplo",
+    "caixa": 20000,
+    "posicoes": [
+      {"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}
+    ],
+    "calls_vendidas": [
+      {"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18", "premio_recebido": 2.0, "contratos": 1}
+    ]
+  }
+]

@@ -1,3 +1,3 @@
 """Options — análise e ranking quantitativo de covered calls."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

@@ -13,7 +13,9 @@ from options.portfolio import (
     Carteira,
     PosicaoAcao,
     avaliar_carteira,
+    avaliar_carteiras,
     carregar_carteira,
+    carregar_carteiras,
 )
 
 
@@ -67,6 +69,49 @@ def test_carregar_carteira_campo_faltando(tmp_path):
 def test_carregar_carteira_arquivo_inexistente(tmp_path):
     with pytest.raises(FileNotFoundError):
         carregar_carteira(tmp_path / "nao_existe.json")
+
+
+# --------------------------------------------------------------------------- #
+# carregar_carteiras (múltiplos clientes)                                     #
+# --------------------------------------------------------------------------- #
+def test_carregar_carteiras_array(tmp_path):
+    arq = tmp_path / "c.json"
+    arq.write_text(json.dumps([
+        {"cliente": "Fulano",
+         "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}]},
+        {"cliente": "Beltrano",
+         "posicoes": [{"ativo": "AAPL", "quantidade": 100, "preco_medio": 180.0}]},
+    ]))
+    carteiras = carregar_carteiras(arq)
+    assert len(carteiras) == 2
+    assert carteiras[0].cliente == "Fulano"
+    assert carteiras[1].cliente == "Beltrano"
+    assert carteiras[1].ativos_detidos() == {"AAPL"}
+
+
+def test_carregar_carteiras_objeto_unico_retrocompat(tmp_path):
+    # formato antigo (objeto único) ainda vira lista de um elemento
+    arq = tmp_path / "c.json"
+    arq.write_text(json.dumps({
+        "cliente": "Fulano",
+        "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
+    }))
+    carteiras = carregar_carteiras(arq)
+    assert len(carteiras) == 1
+    assert carteiras[0].cliente == "Fulano"
+
+
+def test_avaliar_carteiras_itera_clientes(pasta_mock):
+    carteiras = [
+        Carteira(cliente="A", posicoes=[PosicaoAcao("IBIT", 300, 38.0)]),
+        Carteira(cliente="B"),
+    ]
+    rels = avaliar_carteiras(carteiras, _config(pasta_mock), ProvedorMock(pasta_mock))
+    assert len(rels) == 2
+    assert [r.cliente for r in rels] == ["A", "B"]
+    # cliente A detém IBIT → buy-write vazio; cliente B não detém → buy-write com IBIT
+    assert rels[0].buy_write.empty
+    assert not rels[1].buy_write.empty
 
 
 # --------------------------------------------------------------------------- #
