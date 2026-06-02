@@ -180,3 +180,43 @@ CI no GitHub Actions roda lint + mypy + testes em cada PR (Python 3.11 e 3.12).
 A camada de dados é abstraída pela interface `ProvedorDados`, permitindo trocar
 yfinance, dados mock ou qualquer outra fonte sem alterar os modelos ou o ranking.
 O provedor online aplica cache em disco (TTL) e retry com backoff exponencial.
+
+---
+
+## Versionamento
+
+Este projeto segue [Semantic Versioning 2.0.0](https://semver.org/lang/pt-BR/) — `MAJOR.MINOR.PATCH`.
+
+| Incremento | Quando usar |
+|---|---|
+| `MAJOR` | Quebra de compatibilidade: remoção de parâmetros, renomeação de funções públicas, mudança de comportamento que quebra código existente |
+| `MINOR` | Nova funcionalidade sem quebrar compatibilidade: novo modelo, novo campo no output, nova opção de configuração |
+| `PATCH` | Correção de bug, ajuste de cálculo, atualização de dependência sem mudança de API |
+
+### Fluxo de release
+
+```bash
+# 1. Alterar version em pyproject.toml
+# 2. Commit
+git commit -m "chore: bump version to X.Y.Z"
+# 3. Tag
+git tag vX.Y.Z
+# 4. Push com tag
+git push origin main --tags
+```
+
+### Instalação fixando versão (Databricks)
+
+```python
+# Versão específica — recomendado para produção
+%pip install git+https://github.com/antonyoggiannini/options.git@v0.1.0
+
+# Sempre a última versão da main
+%pip install git+https://github.com/antonyoggiannini/options.git
+```
+
+### Histórico
+
+| Versão | Descrição |
+|---|---|
+| `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, Monte Carlo, empírico), CLI, cache, backtest |
