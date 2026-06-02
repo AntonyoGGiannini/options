@@ -5,7 +5,7 @@
 lista_ativos = ["IBIT", "AAPL", "IVV", "NVDA", "SPY", "META",
                 "AMZN", "GOOGL", "TSLA", "MSFT", "TFLO", "AGG",
                 "USFR", "REMX", "NU", "TSM", "GLD", "AVEM",
-                "VPL", "BBEU"]
+                "VPL", "BBEU", "AVGO", "MU", "LLY"]
 top_n = 5
 
 # --- risco / mercado ---
