@@ -62,12 +62,23 @@ class CallVendida:
 
 @dataclass
 class Carteira:
-    """Posição completa de um cliente."""
+    """Posição completa de um cliente, incluindo preferências de análise.
+
+    Os parâmetros de análise (limiar_premio_restante, rolagem_*,
+    permitir_strike_abaixo_custo) são opcionais no JSON e têm defaults
+    conservadores. O config.toml cobre apenas o screener (universo, modelos,
+    mercado); o que é por-cliente fica aqui.
+    """
 
     posicoes: list[PosicaoAcao] = field(default_factory=list)
     calls_vendidas: list[CallVendida] = field(default_factory=list)
     caixa: float | None = None
     cliente: str | None = None
+    # parâmetros de análise de carteira (por cliente)
+    limiar_premio_restante: float = 0.20
+    rolagem_min_dias: int = 21
+    rolagem_max_dias: int = 60
+    permitir_strike_abaixo_custo: bool = False
 
     def ativos_detidos(self) -> set[str]:
         return {p.ativo for p in self.posicoes}
@@ -110,11 +121,25 @@ def carregar_carteira(caminho: str | Path) -> Carteira:
     if caixa is not None and not isinstance(caixa, (int, float)):
         raise ValueError("caixa deve ser numérico.")
 
+    limiar = dados.get("limiar_premio_restante", 0.20)
+    rol_min = dados.get("rolagem_min_dias", 21)
+    rol_max = dados.get("rolagem_max_dias", 60)
+    perm = dados.get("permitir_strike_abaixo_custo", False)
+
+    if not isinstance(limiar, (int, float)) or not (0.0 <= float(limiar) <= 1.0):
+        raise ValueError("limiar_premio_restante deve ser um número em [0, 1].")
+    if not isinstance(rol_min, int) or not isinstance(rol_max, int) or rol_min < 0 or rol_max < rol_min:
+        raise ValueError("rolagem_min_dias/rolagem_max_dias inválidos.")
+
     return Carteira(
         posicoes=posicoes,
         calls_vendidas=calls,
         caixa=float(caixa) if caixa is not None else None,
         cliente=dados.get("cliente"),
+        limiar_premio_restante=float(limiar),
+        rolagem_min_dias=int(rol_min),
+        rolagem_max_dias=int(rol_max),
+        permitir_strike_abaixo_custo=bool(perm),
     )
 
 
@@ -190,7 +215,7 @@ def _analisar_covered_call(
         if df.empty:
             continue
 
-        if not config.permitir_strike_abaixo_custo:
+        if not carteira.permitir_strike_abaixo_custo:
             df = df[df["strike"] >= pos.preco_medio].copy()
             if df.empty:
                 logger.info(
@@ -241,11 +266,14 @@ def _analisar_rolagem(
 
         candidata = (
             premio_restante_pct == premio_restante_pct  # not NaN
-            and premio_restante_pct <= config.limiar_premio_restante
+            and premio_restante_pct <= carteira.limiar_premio_restante
         )
         if candidata:
             preco_medio = carteira.preco_medio_de(call.ativo)
-            alvo = _melhor_roll(call, dados, config, valor_atual, preco_medio)
+            alvo = _melhor_roll(
+                call, dados, config, valor_atual, preco_medio,
+                carteira.rolagem_min_dias, carteira.rolagem_max_dias,
+            )
             if alvo is None:
                 linha["acao"] = "rolar (sem alvo na janela)"
             else:
@@ -302,6 +330,8 @@ def _melhor_roll(
     config: Config,
     valor_recompra: float,
     preco_medio: float | None,
+    rolagem_min_dias: int,
+    rolagem_max_dias: int,
 ) -> dict[str, Any] | None:
     """Encontra o melhor vencimento-alvo para o roll-out (maior crédito líquido)."""
     historico = dados.historico_precos if config.usar_prob_empirica else None
@@ -311,8 +341,8 @@ def _melhor_roll(
         taxa_livre_risco=config.taxa_livre_risco,
         dividend_yield=config.dividend_para(call.ativo),
         usar_premio=config.usar_premio,
-        t_min=config.rolagem_min_dias,
-        t_max=config.rolagem_max_dias,
+        t_min=rolagem_min_dias,
+        t_max=rolagem_max_dias,
         dias_ano=config.dias_ano,
         historico_precos=historico,
         usar_prob_d2=config.usar_prob_d2,

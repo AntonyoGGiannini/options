@@ -87,9 +87,6 @@ def construir_config(args: argparse.Namespace) -> Config:
         "salvar_mock": args.salvar_mock,
         "pasta_mock": args.pasta_mock,
         "usar_cache": False if args.sem_cache else None,
-        "limiar_premio_restante": getattr(args, "limiar_premio_restante", None),
-        "rolagem_min_dias": getattr(args, "rolagem_min_dias", None),
-        "rolagem_max_dias": getattr(args, "rolagem_max_dias", None),
     }
     return config.aplicar_overrides(**overrides)
 
@@ -126,6 +123,13 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError, FileNotFoundError) as exc:
             logger.error("Carteira inválida: %s", exc)
             return 2
+        # overrides CLI sobrescrevem os valores do JSON por-cliente
+        if getattr(args, "limiar_premio_restante", None) is not None:
+            carteira.limiar_premio_restante = args.limiar_premio_restante
+        if getattr(args, "rolagem_min_dias", None) is not None:
+            carteira.rolagem_min_dias = args.rolagem_min_dias
+        if getattr(args, "rolagem_max_dias", None) is not None:
+            carteira.rolagem_max_dias = args.rolagem_max_dias
         relatorio = avaliar_carteira(carteira, config)
         reportar_carteira(relatorio, args.saida)
         return 0

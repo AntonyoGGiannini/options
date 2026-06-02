@@ -17,20 +17,16 @@ from options.portfolio import (
 )
 
 
-def _config(pasta_mock: str, **extra) -> Config:
-    base = dict(
+def _config(pasta_mock: str) -> Config:
+    return Config(
         lista_ativos=["IBIT"],
         top_n=5,
         prob_exerc_max=0.99,
         min_dias=0,
         max_dias=365,
-        rolagem_min_dias=0,
-        rolagem_max_dias=365,
         modo_offline=True,
         pasta_mock=pasta_mock,
     )
-    base.update(extra)
-    return Config(**base)
 
 
 # --------------------------------------------------------------------------- #
@@ -45,6 +41,9 @@ def test_carregar_carteira_valida(tmp_path):
         "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0,
                             "expiration": "2026-06-18", "premio_recebido": 2.0,
                             "contratos": 1}],
+        "limiar_premio_restante": 0.15,
+        "rolagem_min_dias": 14,
+        "rolagem_max_dias": 45,
     }))
     cart = carregar_carteira(arq)
     assert cart.cliente == "Fulano"
@@ -53,6 +52,9 @@ def test_carregar_carteira_valida(tmp_path):
     assert cart.calls_vendidas[0].strike == 45.0
     assert cart.ativos_detidos() == {"IBIT"}
     assert cart.preco_medio_de("IBIT") == 38.0
+    assert cart.limiar_premio_restante == 0.15
+    assert cart.rolagem_min_dias == 14
+    assert cart.rolagem_max_dias == 45
 
 
 def test_carregar_carteira_campo_faltando(tmp_path):
@@ -101,11 +103,11 @@ def test_rolagem_premio_restante_baixo_dispara_rolar(pasta_mock):
     carteira = Carteira(
         posicoes=[PosicaoAcao("IBIT", 100, 38.0)],
         calls_vendidas=[CallVendida("IBIT", 45.0, "2026-06-18", 2.0, 1)],
+        limiar_premio_restante=0.20,
+        rolagem_min_dias=0,
+        rolagem_max_dias=365,
     )
-    rel = avaliar_carteira(
-        carteira, _config(pasta_mock, limiar_premio_restante=0.20),
-        ProvedorMock(pasta_mock),
-    )
+    rel = avaliar_carteira(carteira, _config(pasta_mock), ProvedorMock(pasta_mock))
     linha = rel.rolagem.iloc[0]
     assert linha["premio_restante_pct"] <= 0.20
     assert linha["acao"] == "rolar"
@@ -117,11 +119,9 @@ def test_rolagem_premio_alto_mantem(pasta_mock):
     # prêmio recebido baixo (0.40) → recompra 0.365 ≈ 91% restante → manter
     carteira = Carteira(
         calls_vendidas=[CallVendida("IBIT", 45.0, "2026-06-18", 0.40, 1)],
+        limiar_premio_restante=0.20,
     )
-    rel = avaliar_carteira(
-        carteira, _config(pasta_mock, limiar_premio_restante=0.20),
-        ProvedorMock(pasta_mock),
-    )
+    rel = avaliar_carteira(carteira, _config(pasta_mock), ProvedorMock(pasta_mock))
     linha = rel.rolagem.iloc[0]
     assert linha["premio_restante_pct"] > 0.20
     assert linha["acao"] == "manter"
