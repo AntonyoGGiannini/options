@@ -140,6 +140,26 @@ Formato do JSON (ver `mock_carteira.json`):
 Gera um Excel com três abas (`covered_call`, `rolagem`, `buy_write`) e imprime
 o resumo de cada frente no terminal.
 
+#### Base mock em pasta dedicada
+
+Para validar tudo offline com uma base salva uma única vez, use `--pasta-mock`
+apontando para uma pasta dedicada (mantém os `mock_<TICKER>_*` fora da raiz):
+
+```bash
+# 1) salva a base de todos os ativos da config (uma vez, com internet)
+options --config config.toml --salvar-mock --pasta-mock ./base_mock
+
+# 2) tickers detidos na carteira que não estão na lista_ativos? salve-os também
+options --ativos NU,TSM --salvar-mock --pasta-mock ./base_mock
+
+# 3) rode tudo offline a partir da base
+options --offline --pasta-mock ./base_mock carteira --arquivo exemplo_carteira.json
+```
+
+Salve o conjunto de tickers = `lista_ativos` ∪ ativos detidos ∪ ativos com calls
+vendidas. Para a rolagem usar a recompra real (mid da cadeia, não o fallback
+Black-Scholes), a base do ativo precisa conter o strike + vencimento da call vendida.
+
 ### Parâmetros configuráveis (`config.toml`)
 
 | Parâmetro | Padrão | Descrição |
