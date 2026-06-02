@@ -1,0 +1,13 @@
+{
+  "cliente": "Carteira de Teste",
+  "caixa": 100000,
+  "posicoes": [
+    {"ativo": "AAPL", "quantidade": 300, "preco_medio": 180.0},
+    {"ativo": "NVDA", "quantidade": 200, "preco_medio": 95.0},
+    {"ativo": "MSFT", "quantidade": 100, "preco_medio": 410.0}
+  ],
+  "calls_vendidas": [
+    {"ativo": "AAPL", "strike": 210.0, "expiration": "2026-07-17", "premio_recebido": 3.5, "contratos": 2},
+    {"ativo": "NVDA", "strike": 125.0, "expiration": "2026-06-26", "premio_recebido": 2.0, "contratos": 1}
+  ]
+}
