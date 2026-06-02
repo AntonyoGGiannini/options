@@ -104,6 +104,42 @@ options --config config.toml backtest --distancia 0.05 --dias 14
 Reporta, por ativo: nº de trades, retorno médio/anualizado da covered call,
 taxa de exercício, taxa de acerto e comparação com buy & hold.
 
+### Análise de carteira
+
+Enquanto o screener varre o universo de forma agnóstica de posição, o subcomando
+`carteira` cruza a posição **de um cliente** (arquivo JSON) com a saída do
+screener e gera três frentes de recomendação:
+
+1. **Covered call** — vende calls sobre ações detidas ainda **descobertas**
+   (contratos possíveis − contratos já vendidos); por padrão exclui strikes
+   abaixo do preço médio (não trava prejuízo).
+2. **Rolagem** — para cada call já vendida, calcula o custo de recompra
+   (mid da cadeia, ou Black-Scholes com vol realizada como fallback). Quando o
+   **prêmio restante** cai abaixo de `limiar_premio_restante` (a maior parte do
+   crédito já foi capturada), sugere o roll-out de maior **crédito líquido** na
+   janela `rolagem_min_dias`–`rolagem_max_dias`; caso contrário, marca `manter`.
+3. **Buy-write** — ranqueia oportunidades em ativos que o cliente **não** detém.
+
+```bash
+options --offline carteira --arquivo mock_carteira.json --saida analise_carteira.xlsx
+options carteira --arquivo carteira.json --limiar-premio-restante 0.25 --rolagem-max-dias 75
+```
+
+Formato do JSON (ver `mock_carteira.json`):
+
+```json
+{
+  "cliente": "Cliente Exemplo",
+  "caixa": 20000,
+  "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
+  "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18",
+                      "premio_recebido": 2.0, "contratos": 1}]
+}
+```
+
+Gera um Excel com três abas (`covered_call`, `rolagem`, `buy_write`) e imprime
+o resumo de cada frente no terminal.
+
 ### Parâmetros configuráveis (`config.toml`)
 
 | Parâmetro | Padrão | Descrição |
@@ -124,6 +160,9 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 | `usar_cache` / `cache_ttl_horas` | `true` / `6.0` | Cache em disco dos dados de mercado |
 | `modo_offline` / `salvar_mock` | `false` | Usar/gerar dados mock locais |
 | `preco_medio_aquisicao` | — | Preço de custo por ativo (tabela `[preco_medio_aquisicao]`); ativa modo covered_call |
+| `limiar_premio_restante` | `0.20` | Gatilho de rolagem: fração do prêmio ainda em aberto abaixo da qual rolar |
+| `rolagem_min_dias` / `rolagem_max_dias` | `21` / `60` | Janela (dias) do vencimento-alvo do roll-out |
+| `permitir_strike_abaixo_custo` | `false` | Se `true`, sugestões de covered call podem vender strike abaixo do custo |
 
 ---
 
@@ -171,6 +210,7 @@ options/
 ├── config.py            # Config declarativa (TOML) com validação
 ├── runner.py            # Orquestração de alto nível (run e backtest)
 ├── ranking.py           # Filtros + score + top-N
+├── portfolio.py         # Análise de carteira: covered call, rolagem e buy-write
 ├── report.py            # Saída: tabela, Excel e gráfico
 ├── backtest.py          # Backtest da covered call sobre o histórico
 ├── cli.py               # Interface de linha de comando
@@ -248,5 +288,6 @@ git push origin main --tags
 
 | Versão | Descrição |
 |---|---|
+| `0.3.0` | Análise de carteira (`options carteira`): covered call sobre ações descobertas, rolagem por prêmio restante baixo e buy-write em ativos não detidos; custo desacoplado do screener |
 | `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável; remoção do Monte Carlo |
 | `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, Monte Carlo, empírico), CLI, cache, backtest |

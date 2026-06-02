@@ -48,6 +48,16 @@ pasta_cache    = ".cache"
 # --- saída ---
 arquivo_excel = "top_opcoes_covered_call.xlsx"
 
+# --- análise de carteira (subcomando `options carteira`) ---
+# Gatilho de rolagem: rola a call vendida quando seu valor de recompra cai
+# abaixo desta fração do prêmio recebido (a maior parte do crédito já capturada).
+limiar_premio_restante = 0.20
+# Janela (dias corridos) para buscar o vencimento-alvo do roll-out.
+rolagem_min_dias = 21
+rolagem_max_dias = 60
+# Por padrão, sugestões de covered call não vendem strike abaixo do custo da posição.
+permitir_strike_abaixo_custo = false
+
 # Preço médio de aquisição (opcional). Quando informado, a operação é classificada
 # como "covered_call" e o retorno_sobre_custo reflete o custo real da posição;
 # contratos com strike abaixo do custo recebem alerta_abaixo_custo = true.

@@ -81,8 +81,13 @@ def processar_ativo(
     provedor: ProvedorDados,
     config: Config,
     salvar_mock: bool = False,
+    preco_custo: float | None = None,
 ) -> pd.DataFrame:
     """Obtém dados, calcula probabilidades, filtra e ranqueia um ativo.
+
+    preco_custo: preço médio de aquisição da posição. Quando informado
+    explicitamente (ex.: pela análise de carteira) tem precedência; caso
+    contrário cai no valor da config (None no screener → saída enxuta).
 
     Retorna DataFrame vazio (com aviso em log) em caso de erro ou ausência de
     opções, para não interromper o processamento dos demais ativos.
@@ -117,7 +122,8 @@ def processar_ativo(
             min_amostras_empirica=config.min_amostras_empirica,
         )
 
-        preco_custo = config.preco_custo_para(ativo)
+        if preco_custo is None:
+            preco_custo = config.preco_custo_para(ativo)
         df_top = rankear_calls(df, config, dados.preco_atual, preco_custo=preco_custo)
         if df_top.empty:
             logger.info("[%s] Nenhuma opção passou nos filtros (prob/prazo/retorno).", ativo)
