@@ -21,9 +21,11 @@ def rankear_calls(
 ) -> pd.DataFrame:
     """Aplica custos, filtros e score, retornando as top-N opções ranqueadas.
 
-    preco_custo: preço médio de aquisição do ativo pelo cliente. Quando fornecido,
-    a operação é classificada como 'covered_call' e o retorno é calculado sobre
-    o custo real da posição. Sem ele, é 'buy_write' (capital = preço de mercado).
+    preco_custo: preço médio de aquisição do ativo pelo cliente. É opcional e
+    irrelevante para o screener (varredura de oportunidades). Quando fornecido —
+    ao analisar uma posição já existente — adiciona colunas de custo
+    (retorno_sobre_custo, capital_por_contrato, alerta_abaixo_custo) e sinaliza
+    contratos cujo strike trancaria prejuízo. Sem ele, a saída fica enxuta.
     """
     custo_venda_por_acao = config.custo_venda / config.tamanho_contrato
     df["premio_liquido"] = df["premio"] - custo_venda_por_acao
@@ -56,9 +58,10 @@ def rankear_calls(
         / (1 + config.peso_vega * vega_risk)
     )
 
-    # --- tipo de operação e métricas de capital ---
+    # --- métricas de custo: só ao analisar uma posição existente ---
+    # No screener (sem preco_custo) essas colunas seriam constantes/irrelevantes,
+    # então são omitidas para manter a saída enxuta.
     if preco_custo is not None:
-        df_filtrado["tipo_operacao"] = "covered_call"
         df_filtrado["capital_por_contrato"] = preco_custo * config.tamanho_contrato
         # retorno sobre o custo real da posição existente
         df_filtrado["retorno_sobre_custo"] = (
@@ -66,11 +69,6 @@ def rankear_calls(
         )
         # alerta: vender strike abaixo do custo trava prejuízo se exercido
         df_filtrado["alerta_abaixo_custo"] = df_filtrado["strike"] < preco_custo
-    else:
-        df_filtrado["tipo_operacao"] = "buy_write"
-        df_filtrado["capital_por_contrato"] = preco_atual * config.tamanho_contrato
-        df_filtrado["retorno_sobre_custo"] = df_filtrado["rendimento_liquido"]
-        df_filtrado["alerta_abaixo_custo"] = False
 
     df_filtrado = df_filtrado.sort_values("score_venda", ascending=False)
     df_filtrado["ranking_ativo"] = range(1, len(df_filtrado) + 1)

@@ -27,14 +27,15 @@ theta, rho). Quando a volatilidade implícita está ausente/inválida, usa-se a
 `dividend_yield` pode ser único ou **por ativo**, e contratos com dividendo e
 delta alto recebem flag de **risco de atribuição antecipada**.
 
-### Tipo de operação
+### Screener vs. análise de posição existente
 
-- **covered_call**: quando `preco_medio_aquisicao` é fornecido para o ativo.
-  `retorno_sobre_custo` reflete o rendimento sobre o capital já investido.
-  Contratos com `strike < preco_medio_aquisicao` recebem `alerta_abaixo_custo = true`
-  (exercício trancaria prejuízo).
-- **buy_write**: sem custo informado. `capital_por_contrato` = preço atual × 100
-  ações (capital necessário para adquirir o ativo e vender a call).
+- **Screener (default):** sem `preco_medio_aquisicao`. Use para varrer dezenas de
+  ativos em busca de oportunidades de venda de call (incl. buy-write). A saída é
+  enxuta — o preço médio não importa aqui.
+- **Posição existente (opcional):** ao informar `preco_medio_aquisicao` para um
+  ativo, a saída ganha colunas de custo (`retorno_sobre_custo`,
+  `capital_por_contrato`) e o flag `alerta_abaixo_custo = true` para strikes abaixo
+  do custo (exercício trancaria prejuízo).
 
 Filtros aplicados antes do ranking:
 - `distancia_strike_pct ≥ min_distancia_strike_pct` (padrão 0.0 = apenas OTM+)
@@ -131,10 +132,12 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 Gera `top_opcoes_covered_call.xlsx` (configurável em `arquivo_excel`) com o
 ranking das melhores opções por ativo. Principais colunas:
 
+As colunas de custo (`retorno_sobre_custo`, `capital_por_contrato`,
+`alerta_abaixo_custo`) só aparecem quando `preco_medio_aquisicao` é informado.
+
 | Coluna | Descrição |
 |---|---|
 | `ativo` | Ticker |
-| `tipo_operacao` | `covered_call` (custo informado) ou `buy_write` |
 | `ranking_ativo` | Posição dentro do ativo (1 = melhor) |
 | `strike` | Strike da opção |
 | `premio` | Prêmio por ação (conforme `usar_premio`) |
@@ -146,11 +149,11 @@ ranking das melhores opções por ativo. Principais colunas:
 | `delta` / `theta` / `vega` | Greeks do contrato |
 | `fonte_vol` | `implicita` ou `historica` (fallback de volatilidade) |
 | `risco_atribuicao_antecipada` | Flag de exercício antecipado (dividendo + delta alto) |
-| `alerta_abaixo_custo` | `true` se strike < preço médio de aquisição |
+| `alerta_abaixo_custo` | (com custo) `true` se strike < preço médio de aquisição |
 | `retorno_anualizado_pct` | Retorno anualizado bruto do prêmio |
 | `retorno_anualizado_liquido` | Retorno anualizado líquido de custos |
-| `retorno_sobre_custo` | Prêmio líquido / custo de aquisição (covered_call) ou / preço atual (buy_write) |
-| `capital_por_contrato` | Capital referência por contrato (USD) |
+| `retorno_sobre_custo` | (com custo) Prêmio líquido / preço médio de aquisição |
+| `capital_por_contrato` | (com custo) Capital da posição por contrato (USD) |
 | `bid` / `ask` | Preços de mercado |
 | `volume` / `openInterest` | Liquidez |
 | `preco_atual_ativo` | Preço atual do ativo |

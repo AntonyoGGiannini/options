@@ -69,8 +69,8 @@ def test_executar_consolida_resultado(pasta_mock):
     assert len(df) <= 3
 
 
-def test_covered_call_com_custo(pasta_mock):
-    """Verifica que preco_medio_aquisicao ativa modo covered_call e alerta."""
+def test_posicao_existente_com_custo(pasta_mock):
+    """Com preco_medio_aquisicao, adiciona colunas de custo e alerta."""
     config = Config(
         lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
         min_dias=0, max_dias=365,
@@ -80,13 +80,13 @@ def test_covered_call_com_custo(pasta_mock):
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
     if not df.empty:
-        assert (df["tipo_operacao"] == "covered_call").all()
         assert df["alerta_abaixo_custo"].all()
         assert (df["capital_por_contrato"] == 999.0 * 100).all()
+        assert "retorno_sobre_custo" in df.columns
 
 
-def test_buy_write_sem_custo(pasta_mock):
-    """Sem custo informado, operação é buy_write e capital = preço atual."""
+def test_screener_sem_custo_saida_enxuta(pasta_mock):
+    """Sem custo informado (screener), as colunas de custo são omitidas."""
     config = Config(
         lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
         min_dias=0, max_dias=365,
@@ -95,5 +95,5 @@ def test_buy_write_sem_custo(pasta_mock):
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
     if not df.empty:
-        assert (df["tipo_operacao"] == "buy_write").all()
-        assert not df["alerta_abaixo_custo"].any()
+        for col in ["capital_por_contrato", "retorno_sobre_custo", "alerta_abaixo_custo"]:
+            assert col not in df.columns

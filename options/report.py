@@ -12,7 +12,6 @@ logger = obter_logger(__name__)
 
 COLUNAS_OUTPUT = [
     "ativo",
-    "tipo_operacao",
     "ranking_ativo",
     "strike",
     "premio",
