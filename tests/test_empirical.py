@@ -42,7 +42,9 @@ def test_strike_inalcancavel_da_prob_zero():
 
 
 def test_multiplas_janelas_processadas():
-    precos = pd.Series(np.linspace(100.0, 150.0, 300))
+    # Série longa o suficiente para 30+ janelas não-sobrepostas de tamanho 20.
+    # 30 janelas × 20 dias + 20 de lookahead = 620 pontos mínimos.
+    precos = pd.Series(np.linspace(100.0, 150.0, 700))
     probs, usa = calcular_probabilidade_empirica_batch(
         precos,
         np.array([100.0, 100.0]),

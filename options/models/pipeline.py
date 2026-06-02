@@ -8,7 +8,6 @@ import pandas as pd
 from options.models.black_scholes import calcular_prob_exercicio_risk_neutral_vetor
 from options.models.empirical import calcular_probabilidade_empirica_batch
 from options.models.greeks import calcular_greeks_call
-from options.models.monte_carlo import calcular_prob_acima_strike_monte_carlo_batch
 from options.models.volatility import volatilidade_realizada
 
 
@@ -35,24 +34,25 @@ def preparar_calls_para_modelo(
     taxa_livre_risco,
     dividend_yield,
     usar_premio,
-    mu=0.0,
-    n_simulacoes=10000,
-    seed=None,
-    batch_size=500,
     t_min=0,
     t_max=365,
     dias_ano=365,
     historico_precos=None,
     usar_prob_d2=True,
-    usar_prob_mc=True,
     usar_prob_empirica=True,
     min_amostras_empirica=30,
 ):
     """
     Calcula métricas de contrato por cadeia de opções.
-    Flags usar_prob_d2 / usar_prob_mc / usar_prob_empirica permitem ligar/desligar
-    cada modelo independentemente.
-    prob_exercicio_final = max(prob_exercicio, prob_empirica) — abordagem conservadora.
+    Flags usar_prob_d2 / usar_prob_empirica permitem ligar/desligar cada modelo.
+    prob_exercicio_final = max(prob_exercicio_d2, prob_empirica) — conservador.
+
+    Premissas:
+    - Greeks e prob d2 assumem exercício europeu (Black-Scholes). Para calls
+      americanas com dividendo, o flag risco_atribuicao_antecipada sinaliza
+      contratos com delta ≥ 0.70, onde o exercício antecipado é mais provável.
+    - prob_d2 (risk-neutral) e prob_empirica (mundo real) são medidas distintas;
+      combiná-las via max é conservador mas heterogêneo por construção.
     """
     if df_calls.empty:
         return df_calls.copy()
@@ -76,6 +76,10 @@ def preparar_calls_para_modelo(
     df["distancia_strike_pct"] = (df["strike"] / df["preco_atual"]) - 1
     df["retorno_necessario"] = df["distancia_strike_pct"]
     df["retorno_premio_pct"] = df["premio"] / df["preco_atual"]
+
+    # guarda contra divisão por zero antes de anualizar
+    df = df[df["dias_vencimento"] > 0].copy()
+
     df["retorno_anualizado_pct"] = df["retorno_premio_pct"] * (dias_ano / df["dias_vencimento"])
     df["rendimento"] = df["premio"] / preco_atual
 
@@ -102,17 +106,6 @@ def preparar_calls_para_modelo(
     else:
         df["prob_exercicio"] = np.nan
 
-    # --- prob_exercicio_mc (Monte Carlo) ---
-    if usar_prob_mc:
-        df["prob_exercicio_mc"] = calcular_prob_acima_strike_monte_carlo_batch(
-            df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
-            df["T"].to_numpy(), mu=mu, sigma=iv_usada,
-            q=dividend_yield, n_simulacoes=n_simulacoes,
-            seed=seed, batch_size=batch_size
-        )
-    else:
-        df["prob_exercicio_mc"] = np.nan
-
     # --- Greeks (Black-Scholes) ---
     greeks = calcular_greeks_call(
         df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
@@ -129,7 +122,7 @@ def preparar_calls_para_modelo(
     # antecipado próximo à data ex-dividendo.
     df["risco_atribuicao_antecipada"] = (dividend_yield > 0) & (df["delta"] >= 0.70)
 
-    # --- prob_empirica (histórico) ---
+    # --- prob_empirica (histórico, janelas não-sobrepostas) ---
     if usar_prob_empirica and historico_precos is not None and len(historico_precos) > 0:
         probs_emp, usa_emp = calcular_probabilidade_empirica_batch(
             historico_precos,

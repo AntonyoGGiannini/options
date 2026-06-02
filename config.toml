@@ -17,20 +17,19 @@ dividend_yield   = 0.00
 
 # --- modelos de probabilidade ---
 usar_prob_d2       = true
-usar_prob_mc       = true
 usar_prob_empirica = true
 periodo_historico  = "5y"
 min_amostras_empirica = 30
-mu            = 0.0
-n_simulacoes  = 50000
-seed          = 42
-batch_size    = 500
 
 # --- prêmio / convenção ---
 usar_premio = "bid"   # bid | ask | lastPrice | mid
 dias_ano    = 365
 min_dias    = 7
 max_dias    = 20
+
+# --- filtro de strike ---
+# 0.0 = apenas OTM (padrão). Valores negativos permitem ITM, ex.: -0.05 = até 5% ITM.
+min_distancia_strike_pct = 0.0
 
 # --- custos (USD por contrato) ---
 tamanho_contrato = 100
@@ -49,7 +48,10 @@ pasta_cache    = ".cache"
 # --- saída ---
 arquivo_excel = "top_opcoes_covered_call.xlsx"
 
-# Preço médio de aquisição (opcional, usado só no gráfico de payoff).
+# Preço médio de aquisição (opcional). Quando informado, a operação é classificada
+# como "covered_call" e o retorno_sobre_custo reflete o custo real da posição;
+# contratos com strike abaixo do custo recebem alerta_abaixo_custo = true.
+# Sem este campo, a operação é "buy_write" (capital = preço de mercado).
 # Exemplo:
 # [preco_medio_aquisicao]
 # IBIT = 55.00

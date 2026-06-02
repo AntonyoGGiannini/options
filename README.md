@@ -1,6 +1,9 @@
 # Options
 
-Ferramenta quantitativa para análise e ranking de **covered calls** em ativos de renda variável (ETFs e ações americanas). Combina três estimativas de probabilidade de exercício e custos de corretagem para identificar a melhor opção a vender dado o perfil de risco do usuário.
+Ferramenta quantitativa para análise e ranking de **covered calls** e oportunidades
+de **buy-write** em ETFs e ações americanas. Combina duas estimativas de probabilidade
+de exercício e custos de corretagem para identificar a melhor opção a vender dado o
+perfil de risco do usuário.
 
 ---
 
@@ -8,9 +11,10 @@ Ferramenta quantitativa para análise e ranking de **covered calls** em ativos d
 
 Para cada call disponível no mercado, o modelo calcula:
 
-1. **Probabilidade de exercício** por três métodos:
+1. **Probabilidade de exercício** por dois métodos:
    - `prob_d2` — Black-Scholes (N(d2)), risk-neutral
-   - `prob_empirica` — frequência histórica: em quantas janelas equivalentes ao prazo o ativo subiu o suficiente para atingir o strike
+   - `prob_empirica` — frequência histórica (janelas não-sobrepostas): em quantas
+     janelas equivalentes ao prazo o ativo subiu o suficiente para atingir o strike
    - `prob_exercicio_final = max(prob_d2, prob_empirica)` — combinação conservadora
 
 2. **Retorno líquido** descontando os custos de corretagem da venda
@@ -23,11 +27,29 @@ theta, rho). Quando a volatilidade implícita está ausente/inválida, usa-se a
 `dividend_yield` pode ser único ou **por ativo**, e contratos com dividendo e
 delta alto recebem flag de **risco de atribuição antecipada**.
 
+### Screener vs. análise de posição existente
+
+- **Screener (default):** sem `preco_medio_aquisicao`. Use para varrer dezenas de
+  ativos em busca de oportunidades de venda de call (incl. buy-write). A saída é
+  enxuta — o preço médio não importa aqui.
+- **Posição existente (opcional):** ao informar `preco_medio_aquisicao` para um
+  ativo, a saída ganha colunas de custo (`retorno_sobre_custo`,
+  `capital_por_contrato`) e o flag `alerta_abaixo_custo = true` para strikes abaixo
+  do custo (exercício trancaria prejuízo).
+
 Filtros aplicados antes do ranking:
-- Apenas calls OTM (strike acima do preço atual)
-- `prob_exercicio_final ≤ PROB_EXERC_MAX`
-- `premio_liquido > 0` (prêmio positivo após custos)
+- `distancia_strike_pct ≥ min_distancia_strike_pct` (padrão 0.0 = apenas OTM+)
+- `prob_exercicio_final ≤ prob_exerc_max`
+- `retorno_anualizado_liquido > 0` (prêmio positivo após custos)
 - Liquidez mínima: `volume ≥ 100`, `openInterest ≥ 500`, `spread ≤ 15%`
+
+### Premissas e limitações
+
+- **Exercício europeu:** Greeks e prob d2 seguem Black-Scholes europeu. Para calls
+  americanas com dividendo, o flag `risco_atribuicao_antecipada` sinaliza delta ≥ 0.70
+  como heurística de risco de early assignment — não substitui modelagem americana.
+- **Medidas heterogêneas:** `prob_d2` é risk-neutral; `prob_empirica` é frequência
+  histórica real. Combiná-las via `max` é conservador mas mistura medidas distintas.
 
 ---
 
@@ -94,19 +116,24 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 | `usar_premio` | `"bid"` | Preço do prêmio: `bid`, `ask`, `lastPrice` ou `mid` |
 | `dias_ano` | `365` | Convenção de anualização (dias corridos) |
 | `min_dias` / `max_dias` | `7` / `20` | Faixa de prazo até vencimento (dias) |
+| `min_distancia_strike_pct` | `0.0` | Distância mínima do strike (0 = OTM+, negativo = permite ITM) |
 | `periodo_historico` | `"5y"` | Janela de histórico para probabilidade empírica |
-| `min_amostras_empirica` | `30` | Mínimo de amostras para ativar prob empírica |
+| `min_amostras_empirica` | `30` | Mínimo de janelas não-sobrepostas para ativar prob empírica |
 | `tamanho_contrato` | `100` | Ações por contrato |
 | `custo_compra` / `custo_venda` / `custo_exercicio` | `0.00` | Custos por contrato (USD) |
 | `usar_cache` / `cache_ttl_horas` | `true` / `6.0` | Cache em disco dos dados de mercado |
 | `modo_offline` / `salvar_mock` | `false` | Usar/gerar dados mock locais |
+| `preco_medio_aquisicao` | — | Preço de custo por ativo (tabela `[preco_medio_aquisicao]`); ativa modo covered_call |
 
 ---
 
 ## Output
 
 Gera `top_opcoes_covered_call.xlsx` (configurável em `arquivo_excel`) com o
-ranking das melhores covered calls por ativo. Principais colunas:
+ranking das melhores opções por ativo. Principais colunas:
+
+As colunas de custo (`retorno_sobre_custo`, `capital_por_contrato`,
+`alerta_abaixo_custo`) só aparecem quando `preco_medio_aquisicao` é informado.
 
 | Coluna | Descrição |
 |---|---|
@@ -116,14 +143,17 @@ ranking das melhores covered calls por ativo. Principais colunas:
 | `premio` | Prêmio por ação (conforme `usar_premio`) |
 | `expiration` | Data de vencimento |
 | `dias_uteis_ate_vencimento` | Pregões até o vencimento |
-| `prob_exercicio` | Probabilidade Black-Scholes (d2) |
-| `prob_empirica` | Probabilidade histórica empírica |
+| `prob_exercicio` | Probabilidade Black-Scholes (d2), risk-neutral |
+| `prob_empirica` | Probabilidade histórica empírica (janelas não-sobrepostas) |
 | `prob_exercicio_final` | Probabilidade conservadora final `max(d2, empírica)` |
 | `delta` / `theta` / `vega` | Greeks do contrato |
 | `fonte_vol` | `implicita` ou `historica` (fallback de volatilidade) |
 | `risco_atribuicao_antecipada` | Flag de exercício antecipado (dividendo + delta alto) |
+| `alerta_abaixo_custo` | (com custo) `true` se strike < preço médio de aquisição |
 | `retorno_anualizado_pct` | Retorno anualizado bruto do prêmio |
 | `retorno_anualizado_liquido` | Retorno anualizado líquido de custos |
+| `retorno_sobre_custo` | (com custo) Prêmio líquido / preço médio de aquisição |
+| `capital_por_contrato` | (com custo) Capital da posição por contrato (USD) |
 | `bid` / `ask` | Preços de mercado |
 | `volume` / `openInterest` | Liquidez |
 | `preco_atual_ativo` | Preço atual do ativo |
@@ -153,8 +183,7 @@ options/
 │   └── retry.py         # backoff exponencial
 └── models/              # Núcleo quantitativo
     ├── black_scholes.py # prob d2 (risk-neutral) e preço da call
-    ├── monte_carlo.py   # prob Monte Carlo (batch)
-    ├── empirical.py     # prob empírica histórica
+    ├── empirical.py     # prob empírica histórica (janelas não-sobrepostas)
     ├── greeks.py        # delta, gamma, vega, theta, rho
     ├── volatility.py    # volatilidade realizada (fallback de IV)
     ├── pipeline.py      # métricas por cadeia de opções
@@ -162,7 +191,7 @@ options/
 
 config.toml              # Configuração da execução
 tests/                   # Suíte pytest (modelos, greeks, backtest, e2e)
-t1.py / functions.py     # Shims de compatibilidade retroativa
+t1.py                    # Entrypoint legado (carrega config.toml automaticamente)
 ```
 
 ### Desenvolvimento
@@ -219,4 +248,5 @@ git push origin main --tags
 
 | Versão | Descrição |
 |---|---|
+| `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável; remoção do Monte Carlo |
 | `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, Monte Carlo, empírico), CLI, cache, backtest |
