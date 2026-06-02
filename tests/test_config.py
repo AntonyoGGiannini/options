@@ -53,3 +53,26 @@ def test_from_toml(tmp_path):
     assert c.lista_ativos == ["AAPL", "MSFT"]
     assert c.top_n == 3
     assert c.prob_exerc_max == 0.10
+
+
+def test_custo_exercicio_para_minimo():
+    # strike baixo: 0,25% * 30 * 100 = 7,50 < 10 → aplica o mínimo de 10
+    c = Config()
+    assert c.custo_exercicio_para(30.0) == 10.0
+
+
+def test_custo_exercicio_para_percentual():
+    # strike alto: 0,25% * 80 * 100 = 20 > 10 → aplica o percentual
+    c = Config()
+    assert c.custo_exercicio_para(80.0) == pytest.approx(20.0)
+
+
+def test_custo_exercicio_para_taxa_fixa_adicional():
+    c = Config(custo_exercicio=2.0)
+    # max(10, 7.5) + taxa fixa 2 = 12
+    assert c.custo_exercicio_para(30.0) == pytest.approx(12.0)
+
+
+def test_custo_exercicio_pct_negativo_invalido():
+    with pytest.raises(ValueError):
+        Config(custo_exercicio_pct=-0.01)
