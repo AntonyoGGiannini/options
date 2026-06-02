@@ -21,7 +21,7 @@ class Config:
     lista_ativos: list[str] = field(default_factory=lambda: ["IBIT"])
     top_n: int = 5
 
-    # --- preço médio de aquisição (gráfico) ---
+    # --- preço médio de aquisição (ranking + gráfico) ---
     # None, float único ou dict {ativo: preco}
     preco_medio_aquisicao: float | dict[str, float] | None = None
 
@@ -33,20 +33,20 @@ class Config:
 
     # --- modelos de probabilidade ---
     usar_prob_d2: bool = True
-    usar_prob_mc: bool = True
     usar_prob_empirica: bool = True
     periodo_historico: str = "5y"
     min_amostras_empirica: int = 30
-    mu: float = 0.0
-    n_simulacoes: int = 50000
-    seed: int | None = 42
-    batch_size: int = 500
 
     # --- prêmio / convenção ---
     usar_premio: str = "bid"
     dias_ano: int = 365
     min_dias: int = 7
     max_dias: int = 20
+
+    # --- filtro de strike ---
+    # Distância mínima do strike em relação ao preço atual (ex.: 0.0 = ATM+,
+    # -0.05 = permite até 5% ITM). Default 0.0 mantém comportamento anterior (OTM).
+    min_distancia_strike_pct: float = 0.0
 
     # --- custos ---
     tamanho_contrato: int = 100
@@ -93,12 +93,10 @@ class Config:
             raise ValueError("dias_ano deve ser > 0")
         if self.min_dias < 0 or self.max_dias < self.min_dias:
             raise ValueError("intervalo de dias inválido (min_dias/max_dias)")
+        if self.min_distancia_strike_pct < -1.0:
+            raise ValueError("min_distancia_strike_pct não pode ser menor que -1.0")
         if self.tamanho_contrato <= 0:
             raise ValueError("tamanho_contrato deve ser > 0")
-        if self.n_simulacoes <= 0:
-            raise ValueError("n_simulacoes deve ser > 0")
-        if self.batch_size <= 0:
-            raise ValueError("batch_size deve ser > 0")
         if self.cache_ttl_horas < 0:
             raise ValueError("cache_ttl_horas não pode ser negativo")
         if self.peso_theta < 0:
@@ -130,6 +128,16 @@ class Config:
         if isinstance(self.dividend_yield, dict):
             return float(self.dividend_yield.get(ativo, 0.0))
         return float(self.dividend_yield)
+
+    def preco_custo_para(self, ativo: str) -> float | None:
+        """Resolve o preço médio de aquisição de um ativo."""
+        pma = self.preco_medio_aquisicao
+        if isinstance(pma, dict):
+            v = pma.get(ativo)
+            return float(v) if v is not None else None
+        if isinstance(pma, (int, float)):
+            return float(pma)
+        return None
 
     def aplicar_overrides(self, **kwargs: Any) -> Config:
         """Retorna uma nova Config com os campos não-None sobrescritos."""

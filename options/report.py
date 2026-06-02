@@ -12,6 +12,7 @@ logger = obter_logger(__name__)
 
 COLUNAS_OUTPUT = [
     "ativo",
+    "tipo_operacao",
     "ranking_ativo",
     "strike",
     "premio",
@@ -25,8 +26,11 @@ COLUNAS_OUTPUT = [
     "vega",
     "fonte_vol",
     "risco_atribuicao_antecipada",
+    "alerta_abaixo_custo",
     "retorno_anualizado_pct",
     "retorno_anualizado_liquido",
+    "retorno_sobre_custo",
+    "capital_por_contrato",
     "bid",
     "ask",
     "volume",
@@ -49,15 +53,6 @@ def salvar_excel(df_output: pd.DataFrame, caminho: str) -> str:
     return caminho
 
 
-def _preco_custo_para(config: Config, ativo: str) -> float | None:
-    pma = config.preco_medio_aquisicao
-    if isinstance(pma, dict):
-        return pma.get(ativo)
-    if isinstance(pma, (int, float)):
-        return float(pma)
-    return None
-
-
 def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
     """Gera o gráfico de payoff da melhor opção geral (maior score)."""
     if df_final.empty:
@@ -65,7 +60,7 @@ def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
 
     melhor = df_final.sort_values("score_venda", ascending=False).iloc[0]
     ativo_melhor = melhor["ativo"]
-    preco_custo = _preco_custo_para(config, ativo_melhor)
+    preco_custo = config.preco_custo_para(ativo_melhor)
 
     prob_emp = melhor.get("prob_empirica")
     prob_emp_str = f"{prob_emp:.2%}" if prob_emp is not None and not pd.isna(prob_emp) else "N/A"

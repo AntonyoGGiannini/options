@@ -25,13 +25,11 @@ def test_pipeline_produz_colunas_esperadas(dados_ibit):
         taxa_livre_risco=0.045,
         dividend_yield=0.0,
         usar_premio="bid",
-        n_simulacoes=2000,
-        seed=42,
         t_min=0,
         t_max=365,
         historico_precos=dados_ibit.historico_precos,
     )
-    for col in ["prob_exercicio", "prob_exercicio_mc", "prob_empirica",
+    for col in ["prob_exercicio", "prob_empirica",
                 "prob_exercicio_final", "premio", "T",
                 "delta", "gamma", "vega", "theta", "iv_usada", "fonte_vol",
                 "risco_atribuicao_antecipada"]:
@@ -47,7 +45,7 @@ def test_pipeline_produz_colunas_esperadas(dados_ibit):
 def test_processar_ativo_offline_ranqueia(pasta_mock):
     config = Config(
         lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365, n_simulacoes=2000,
+        min_dias=0, max_dias=365,
         modo_offline=True, pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
@@ -62,10 +60,40 @@ def test_processar_ativo_offline_ranqueia(pasta_mock):
 def test_executar_consolida_resultado(pasta_mock):
     config = Config(
         lista_ativos=["IBIT"], top_n=3, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365, n_simulacoes=1000,
+        min_dias=0, max_dias=365,
         modo_offline=True, pasta_mock=pasta_mock,
     )
     df = executar(config)
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
     assert len(df) <= 3
+
+
+def test_covered_call_com_custo(pasta_mock):
+    """Verifica que preco_medio_aquisicao ativa modo covered_call e alerta."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+        preco_medio_aquisicao={"IBIT": 999.0},  # custo alto → todos alertam
+    )
+    provedor = ProvedorMock(pasta_mock)
+    df = processar_ativo("IBIT", provedor, config)
+    if not df.empty:
+        assert (df["tipo_operacao"] == "covered_call").all()
+        assert df["alerta_abaixo_custo"].all()
+        assert (df["capital_por_contrato"] == 999.0 * 100).all()
+
+
+def test_buy_write_sem_custo(pasta_mock):
+    """Sem custo informado, operação é buy_write e capital = preço atual."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    provedor = ProvedorMock(pasta_mock)
+    df = processar_ativo("IBIT", provedor, config)
+    if not df.empty:
+        assert (df["tipo_operacao"] == "buy_write").all()
+        assert not df["alerta_abaixo_custo"].any()
