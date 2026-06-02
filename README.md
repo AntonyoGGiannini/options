@@ -107,8 +107,8 @@ taxa de exercício, taxa de acerto e comparação com buy & hold.
 ### Análise de carteira
 
 Enquanto o screener varre o universo de forma agnóstica de posição, o subcomando
-`carteira` cruza a posição **de um cliente** (arquivo JSON) com a saída do
-screener e gera três frentes de recomendação:
+`carteira` cruza a posição **de um ou mais clientes** (arquivo JSON) com a saída
+do screener e gera três frentes de recomendação **por cliente**:
 
 1. **Covered call** — vende calls sobre ações detidas ainda **descobertas**
    (contratos possíveis − contratos já vendidos); por padrão exclui strikes
@@ -121,24 +121,31 @@ screener e gera três frentes de recomendação:
 3. **Buy-write** — ranqueia oportunidades em ativos que o cliente **não** detém.
 
 ```bash
-options --offline carteira --arquivo mock_carteira.json --saida analise_carteira.xlsx
+# --saida é a PASTA de saída; gera um analise_<cliente>.xlsx por cliente
+options --offline carteira --arquivo mock_carteira.json --saida ./relatorios
 options carteira --arquivo carteira.json --limiar-premio-restante 0.25 --rolagem-max-dias 75
 ```
 
-Formato do JSON (ver `mock_carteira.json`):
+O JSON aceita **um cliente** (objeto único, retrocompatível) ou **vários
+clientes** (array). Com array, a função itera sobre todos e gera um Excel por
+cliente. Formato (ver `mock_carteira.json` e `exemplo_carteira.json`):
 
 ```json
-{
-  "cliente": "Cliente Exemplo",
-  "caixa": 20000,
-  "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
-  "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18",
-                      "premio_recebido": 2.0, "contratos": 1}]
-}
+[
+  {
+    "cliente": "Cliente Exemplo",
+    "caixa": 20000,
+    "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
+    "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18",
+                        "premio_recebido": 2.0, "contratos": 1}]
+  }
+]
 ```
 
-Gera um Excel com três abas (`covered_call`, `rolagem`, `buy_write`) e imprime
-o resumo de cada frente no terminal.
+Para cada cliente gera um Excel `analise_<cliente>.xlsx` (na pasta `--saida`) com
+três abas (`covered_call`, `rolagem`, `buy_write`) e imprime o resumo de cada
+frente no terminal. Os overrides de CLI (`--limiar-premio-restante`, etc.)
+aplicam-se a todos os clientes do arquivo.
 
 #### Base mock em pasta dedicada
 
@@ -308,6 +315,7 @@ git push origin main --tags
 
 | Versão | Descrição |
 |---|---|
+| `0.4.0` | `options carteira` aceita múltiplos clientes (array no JSON) e itera sobre todos, gerando um `analise_<cliente>.xlsx` por cliente; `--saida` passa a ser a pasta de saída |
 | `0.3.0` | Análise de carteira (`options carteira`): covered call sobre ações descobertas, rolagem por prêmio restante baixo e buy-write em ativos não detidos; custo desacoplado do screener |
 | `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável; remoção do Monte Carlo |
 | `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, Monte Carlo, empírico), CLI, cache, backtest |
