@@ -147,7 +147,7 @@ def preparar_calls_para_modelo(
     # --- prob_exercicio_final = max(d2, empirica) ---
     df["prob_exercicio_final"] = df["prob_exercicio"]
     mascara = df["usa_prob_empirica"] & df["prob_empirica"].notna()
-    df.loc[mascara, "prob_exercicio_final"] = np.maximum(
+    df.loc[mascara, "prob_exercicio_final"] = np.fmax(
         df.loc[mascara, "prob_exercicio"],
         df.loc[mascara, "prob_empirica"],
     )
