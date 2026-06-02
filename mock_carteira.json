@@ -1,12 +1,13 @@
 [
   {
-    "cliente": "Cliente Exemplo",
-    "caixa": 20000,
+    "cliente": "Antonyo Giannini",
+    "caixa": 15000,
     "posicoes": [
-      {"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}
+      {"ativo": "IBIT", "quantidade": 430.9326, "preco_medio": 45.59},
+      {"ativo": "NU", "quantidade": 138.06039, "preco_medio": 13.40}
     ],
     "calls_vendidas": [
-      {"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18", "premio_recebido": 2.0, "contratos": 1}
+      {"ativo": "IBIT", "strike": 46.0, "expiration": "2026-06-18", "premio_recebido": 0.14, "contratos": 1}
     ]
   }
 ]
