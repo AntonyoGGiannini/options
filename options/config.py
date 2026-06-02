@@ -66,6 +66,16 @@ class Config:
     peso_theta: float = 0.0
     peso_vega: float = 0.0
 
+    # --- análise de carteira ---
+    # Gatilho de rolagem: rola quando o valor de recompra da call vendida cai
+    # abaixo desta fração do prêmio recebido (prêmio restante baixo).
+    limiar_premio_restante: float = 0.20
+    # Janela (dias corridos) para buscar o vencimento-alvo do roll-out.
+    rolagem_min_dias: int = 21
+    rolagem_max_dias: int = 60
+    # Por padrão, sugestões de covered call não vendem strike abaixo do custo.
+    permitir_strike_abaixo_custo: bool = False
+
     # --- saída ---
     arquivo_excel: str = "top_opcoes_covered_call.xlsx"
 
@@ -103,6 +113,10 @@ class Config:
             raise ValueError("peso_theta não pode ser negativo")
         if self.peso_vega < 0:
             raise ValueError("peso_vega não pode ser negativo")
+        if not (0.0 <= self.limiar_premio_restante <= 1.0):
+            raise ValueError("limiar_premio_restante deve estar em [0, 1]")
+        if self.rolagem_min_dias < 0 or self.rolagem_max_dias < self.rolagem_min_dias:
+            raise ValueError("intervalo de rolagem inválido (rolagem_min_dias/rolagem_max_dias)")
 
     @classmethod
     def from_dict(cls, dados: dict[str, Any]) -> Config:
