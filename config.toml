@@ -45,7 +45,7 @@ custo_exercicio     = 0.00   # taxa fixa adicional por contrato (opcional)
 # --- dados ---
 modo_offline   = false
 salvar_mock    = false
-pasta_mock     = "."
+pasta_mock     = "base_mock"
 usar_cache     = true
 cache_ttl_horas = 6.0
 pasta_cache    = ".cache"

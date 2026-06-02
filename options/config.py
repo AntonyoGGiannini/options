@@ -62,7 +62,7 @@ class Config:
     # --- dados ---
     modo_offline: bool = False
     salvar_mock: bool = False
-    pasta_mock: str = "."
+    pasta_mock: str = "base_mock"
     usar_cache: bool = True
     cache_ttl_horas: float = 6.0
     pasta_cache: str = ".cache"

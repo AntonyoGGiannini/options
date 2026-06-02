@@ -13,7 +13,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 @pytest.fixture
 def pasta_mock() -> str:
-    return str(RAIZ)
+    return str(RAIZ / "base_mock")
 
 
 @pytest.fixture
