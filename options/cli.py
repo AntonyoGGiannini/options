@@ -37,6 +37,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Salva os dados obtidos online como arquivos mock.",
     )
     parser.add_argument(
+        "--pasta-mock", default=None,
+        help="Pasta dedicada para ler/salvar os dados mock (ex.: ./base_mock).",
+    )
+    parser.add_argument(
         "--sem-cache", action="store_true", default=False,
         help="Desabilita o cache em disco do provedor online.",
     )
@@ -81,6 +85,7 @@ def construir_config(args: argparse.Namespace) -> Config:
         "top_n": args.top_n,
         "modo_offline": args.offline,
         "salvar_mock": args.salvar_mock,
+        "pasta_mock": args.pasta_mock,
         "usar_cache": False if args.sem_cache else None,
         "limiar_premio_restante": getattr(args, "limiar_premio_restante", None),
         "rolagem_min_dias": getattr(args, "rolagem_min_dias", None),
