@@ -52,7 +52,12 @@ class Config:
     tamanho_contrato: int = 100
     custo_compra: float = 0.0
     custo_venda: float = 0.0
-    custo_exercicio: float = 0.0
+    # custo de exercício (atribuição) por contrato = max(pct * valor de venda,
+    # mínimo) + taxa fixa. valor de venda = strike * tamanho_contrato.
+    # Default: 0,25% do valor de venda ou US$ 10 (o que for maior).
+    custo_exercicio_pct: float = 0.0025
+    custo_exercicio_min: float = 10.0
+    custo_exercicio: float = 0.0  # taxa fixa adicional por contrato (opcional)
 
     # --- dados ---
     modo_offline: bool = False
@@ -97,6 +102,12 @@ class Config:
             raise ValueError("min_distancia_strike_pct não pode ser menor que -1.0")
         if self.tamanho_contrato <= 0:
             raise ValueError("tamanho_contrato deve ser > 0")
+        if self.custo_compra < 0 or self.custo_venda < 0 or self.custo_exercicio < 0:
+            raise ValueError("custos (compra/venda/exercício) não podem ser negativos")
+        if self.custo_exercicio_pct < 0:
+            raise ValueError("custo_exercicio_pct não pode ser negativo")
+        if self.custo_exercicio_min < 0:
+            raise ValueError("custo_exercicio_min não pode ser negativo")
         if self.cache_ttl_horas < 0:
             raise ValueError("cache_ttl_horas não pode ser negativo")
         if self.peso_theta < 0:
@@ -128,6 +139,19 @@ class Config:
         if isinstance(self.dividend_yield, dict):
             return float(self.dividend_yield.get(ativo, 0.0))
         return float(self.dividend_yield)
+
+    def custo_exercicio_para(self, strike: float) -> float:
+        """Custo de exercício (atribuição) por contrato para um dado strike.
+
+        Regra: max(custo_exercicio_pct × valor de venda, custo_exercicio_min)
+        mais a taxa fixa custo_exercicio. O valor de venda do ativo no exercício
+        é strike × tamanho_contrato (as ações são vendidas pelo strike).
+        """
+        valor_venda = float(strike) * self.tamanho_contrato
+        return (
+            max(self.custo_exercicio_pct * valor_venda, self.custo_exercicio_min)
+            + self.custo_exercicio
+        )
 
     def preco_custo_para(self, ativo: str) -> float | None:
         """Resolve o preço médio de aquisição de um ativo."""

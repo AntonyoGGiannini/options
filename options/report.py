@@ -30,6 +30,8 @@ COLUNAS_OUTPUT = [
     "retorno_anualizado_liquido",
     "retorno_sobre_custo",
     "capital_por_contrato",
+    "custo_exercicio_contrato",
+    "lucro_se_exercido",
     "bid",
     "ask",
     "volume",
@@ -77,6 +79,9 @@ def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
         expiration=melhor["expiration"],
         preco_custo=preco_custo,
         arquivo_saida=f"payoff_{ativo_melhor}.png",
+        custo_exercicio_contrato=config.custo_exercicio_para(melhor["strike"]),
+        custo_venda_contrato=config.custo_venda,
+        tamanho_contrato=config.tamanho_contrato,
     )
     logger.info("Gráfico de payoff salvo em: %s", arquivo)
     return arquivo

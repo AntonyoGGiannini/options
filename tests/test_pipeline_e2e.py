@@ -97,3 +97,36 @@ def test_screener_sem_custo_saida_enxuta(pasta_mock):
     if not df.empty:
         for col in ["capital_por_contrato", "retorno_sobre_custo", "alerta_abaixo_custo"]:
             assert col not in df.columns
+
+
+def test_screener_filtra_prejuizo_se_exercido(pasta_mock):
+    """Screener: toda opção retornada deve ter lucro positivo se exercida."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    provedor = ProvedorMock(pasta_mock)
+    df = processar_ativo("IBIT", provedor, config)
+    if not df.empty:
+        assert "lucro_se_exercido" in df.columns
+        assert (df["lucro_se_exercido"] > 0).all()
+        assert "custo_exercicio_contrato" in df.columns
+
+
+def test_custo_alto_exclui_por_prejuizo_no_exercicio(pasta_mock):
+    """Custo de aquisição altíssimo → vender abaixo do custo dá prejuízo se
+    exercido; com o filtro ligado (padrão) nada é sugerido."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+        preco_medio_aquisicao={"IBIT": 999.0},
+    )
+    provedor = ProvedorMock(pasta_mock)
+    df = processar_ativo("IBIT", provedor, config)
+    assert df.empty
+    # com o filtro desligado, as opções voltam a aparecer
+    df2 = processar_ativo("IBIT", provedor, config, excluir_prejuizo_exercicio=False)
+    assert not df2.empty
+    assert (df2["lucro_se_exercido"] <= 0).all()

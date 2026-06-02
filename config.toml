@@ -35,7 +35,12 @@ min_distancia_strike_pct = 0.0
 tamanho_contrato = 100
 custo_compra     = 0.00
 custo_venda      = 0.00
-custo_exercicio  = 0.00
+# Custo de exercício (atribuição) por contrato = max(pct * valor de venda,
+# mínimo) + taxa fixa. valor de venda = strike * tamanho_contrato.
+# Default: 0,25% do valor de venda ou US$ 10 (o que for maior).
+custo_exercicio_pct = 0.0025
+custo_exercicio_min = 10.00
+custo_exercicio     = 0.00   # taxa fixa adicional por contrato (opcional)
 
 # --- dados ---
 modo_offline   = false

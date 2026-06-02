@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from options.config import Config
@@ -18,6 +19,7 @@ def rankear_calls(
     config: Config,
     preco_atual: float,
     preco_custo: float | None = None,
+    excluir_prejuizo_exercicio: bool = True,
 ) -> pd.DataFrame:
     """Aplica custos, filtros e score, retornando as top-N opções ranqueadas.
 
@@ -26,17 +28,57 @@ def rankear_calls(
     ao analisar uma posição já existente — adiciona colunas de custo
     (retorno_sobre_custo, capital_por_contrato, alerta_abaixo_custo) e sinaliza
     contratos cujo strike trancaria prejuízo. Sem ele, a saída fica enxuta.
+
+    excluir_prejuizo_exercicio: quando True (padrão), descarta operações que
+    dariam prejuízo se a call fosse exercida — i.e. ``lucro_se_exercido <= 0``.
+    O lucro no exercício considera a venda das ações pelo strike, o prêmio e os
+    custos de venda e de exercício (e de compra, no buy-write). A base de custo é
+    o preço médio do cliente (se informado) ou o preço de mercado (buy-write).
     """
     custo_venda_por_acao = config.custo_venda / config.tamanho_contrato
-    df["premio_liquido"] = df["premio"] - custo_venda_por_acao
+
+    # custo de exercício por contrato depende do strike: max(pct * valor de
+    # venda, mínimo) + taxa fixa. Convertido para base por ação.
+    custo_exerc_contrato = np.maximum(
+        config.custo_exercicio_pct * df["strike"] * config.tamanho_contrato,
+        config.custo_exercicio_min,
+    ) + config.custo_exercicio
+    custo_exerc_por_acao = custo_exerc_contrato / config.tamanho_contrato
+    df["custo_exercicio_contrato"] = custo_exerc_contrato
+
+    # prêmio líquido esperado: desconta o custo de venda e o custo de exercício
+    # ponderado pela probabilidade de a call ser exercida.
+    df["premio_liquido"] = (
+        df["premio"]
+        - custo_venda_por_acao
+        - custo_exerc_por_acao * df["prob_exercicio_final"]
+    )
     df["rendimento_liquido"] = df["premio_liquido"] / df["preco_atual"]
     df["retorno_anualizado_liquido"] = df["rendimento_liquido"] / df["T"]
 
-    df_filtrado = df[
+    # lucro por ação se a call for exercida (ações entregues pelo strike):
+    # (strike - base de custo) + prêmio - custos. No buy-write inclui o custo de
+    # compra; numa posição já existente o custo de compra é afundado.
+    base_custo = preco_custo if preco_custo is not None else preco_atual
+    custo_compra_por_acao = (
+        config.custo_compra / config.tamanho_contrato if preco_custo is None else 0.0
+    )
+    df["lucro_se_exercido"] = (
+        (df["strike"] - base_custo)
+        + df["premio"]
+        - custo_venda_por_acao
+        - custo_exerc_por_acao
+        - custo_compra_por_acao
+    )
+
+    condicoes = (
         (df["distancia_strike_pct"] >= config.min_distancia_strike_pct)
         & (df["prob_exercicio_final"] <= config.prob_exerc_max)
         & (df["retorno_anualizado_liquido"] > 0)
-    ].copy()
+    )
+    if excluir_prejuizo_exercicio:
+        condicoes &= df["lucro_se_exercido"] > 0
+    df_filtrado = df[condicoes].copy()
 
     if df_filtrado.empty:
         return df_filtrado
@@ -82,12 +124,16 @@ def processar_ativo(
     config: Config,
     salvar_mock: bool = False,
     preco_custo: float | None = None,
+    excluir_prejuizo_exercicio: bool = True,
 ) -> pd.DataFrame:
     """Obtém dados, calcula probabilidades, filtra e ranqueia um ativo.
 
     preco_custo: preço médio de aquisição da posição. Quando informado
     explicitamente (ex.: pela análise de carteira) tem precedência; caso
     contrário cai no valor da config (None no screener → saída enxuta).
+
+    excluir_prejuizo_exercicio: repassado a ``rankear_calls`` — descarta
+    operações que dariam prejuízo se a call fosse exercida (padrão True).
 
     Retorna DataFrame vazio (com aviso em log) em caso de erro ou ausência de
     opções, para não interromper o processamento dos demais ativos.
@@ -124,7 +170,10 @@ def processar_ativo(
 
         if preco_custo is None:
             preco_custo = config.preco_custo_para(ativo)
-        df_top = rankear_calls(df, config, dados.preco_atual, preco_custo=preco_custo)
+        df_top = rankear_calls(
+            df, config, dados.preco_atual, preco_custo=preco_custo,
+            excluir_prejuizo_exercicio=excluir_prejuizo_exercicio,
+        )
         if df_top.empty:
             logger.info("[%s] Nenhuma opção passou nos filtros (prob/prazo/retorno).", ativo)
             return pd.DataFrame()

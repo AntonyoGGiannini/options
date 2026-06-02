@@ -16,19 +16,31 @@ def gerar_grafico_payoff_covered_call(
     expiration,
     preco_custo=None,
     arquivo_saida="payoff_covered_call.png",
+    custo_exercicio_contrato=0.0,
+    custo_venda_contrato=0.0,
+    tamanho_contrato=100,
 ):
     """
     Gera gráfico de payoff ao vencimento de uma covered call.
     preco_custo: preço médio de aquisição; se None, usa preco_atual.
+    custo_exercicio_contrato: custo de atribuição por contrato, aplicado por ação
+        apenas quando a call é exercida (ST >= strike).
+    custo_venda_contrato: custo de venda da call por contrato (sempre aplicado).
     """
     custo = preco_custo if preco_custo is not None else preco_atual
+    custo_venda_acao = custo_venda_contrato / tamanho_contrato
+    custo_exerc_acao = custo_exercicio_contrato / tamanho_contrato
 
     s_min = preco_atual * 0.5
     s_max = preco_atual * 1.5
     ST = np.linspace(s_min, s_max, 300)
 
     ganho_acao = ST - custo
-    payoff_call_vendida = -np.maximum(ST - strike, 0) + premio
+    # custo de exercício incide só na região atribuída (ST >= strike)
+    custo_exerc_aplicado = np.where(ST >= strike, custo_exerc_acao, 0.0)
+    payoff_call_vendida = (
+        -np.maximum(ST - strike, 0) + premio - custo_venda_acao - custo_exerc_aplicado
+    )
     payoff_total = ganho_acao + payoff_call_vendida
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -50,7 +62,7 @@ def gerar_grafico_payoff_covered_call(
         fontsize=9, color="#ED7D31", va="bottom",
     )
 
-    breakeven = custo - premio
+    breakeven = custo - premio + custo_venda_acao
     if s_min < breakeven < s_max:
         ax.axvline(breakeven, color="gray", linewidth=0.8, linestyle="--", alpha=0.6)
         ax.annotate(

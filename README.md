@@ -41,7 +41,16 @@ Filtros aplicados antes do ranking:
 - `distancia_strike_pct ≥ min_distancia_strike_pct` (padrão 0.0 = apenas OTM+)
 - `prob_exercicio_final ≤ prob_exerc_max`
 - `retorno_anualizado_liquido > 0` (prêmio positivo após custos)
+- `lucro_se_exercido > 0` — descarta operações que dariam prejuízo se a call for
+  exercida (venda das ações pelo strike + prêmio − custos de venda/exercício/compra).
+  Pode ser desligado por cliente via `permitir_strike_abaixo_custo`.
 - Liquidez mínima: `volume ≥ 100`, `openInterest ≥ 500`, `spread ≤ 15%`
+
+O **custo de exercício (atribuição)** por contrato segue a regra
+`max(custo_exercicio_pct × strike × tamanho_contrato, custo_exercicio_min) + custo_exercicio`
+— por padrão **0,25% do valor de venda ou US$ 10, o que for maior**. Ele é
+descontado do prêmio líquido (ponderado pela probabilidade de exercício), entra
+no filtro de lucro-se-exercido e é refletido no gráfico de payoff.
 
 ### Premissas e limitações
 
@@ -183,7 +192,9 @@ Black-Scholes), a base do ativo precisa conter o strike + vencimento da call ven
 | `periodo_historico` | `"5y"` | Janela de histórico para probabilidade empírica |
 | `min_amostras_empirica` | `30` | Mínimo de janelas não-sobrepostas para ativar prob empírica |
 | `tamanho_contrato` | `100` | Ações por contrato |
-| `custo_compra` / `custo_venda` / `custo_exercicio` | `0.00` | Custos por contrato (USD) |
+| `custo_compra` / `custo_venda` | `0.00` | Custos por contrato (USD) |
+| `custo_exercicio_pct` / `custo_exercicio_min` | `0.0025` / `10.00` | Custo de exercício = `max(pct × strike × tamanho_contrato, mínimo)` |
+| `custo_exercicio` | `0.00` | Taxa fixa adicional de exercício por contrato (USD) |
 | `usar_cache` / `cache_ttl_horas` | `true` / `6.0` | Cache em disco dos dados de mercado |
 | `modo_offline` / `salvar_mock` | `false` | Usar/gerar dados mock locais |
 | `preco_medio_aquisicao` | — | Preço de custo por ativo (tabela `[preco_medio_aquisicao]`); ativa modo covered_call |
@@ -315,6 +326,7 @@ git push origin main --tags
 
 | Versão | Descrição |
 |---|---|
+| `0.5.0` | Custo de exercício realista (`max(0,25% × valor de venda, US$ 10)`): descontado do prêmio líquido, refletido no payoff e usado no novo filtro `lucro_se_exercido > 0` que descarta operações com prejuízo se exercidas |
 | `0.4.0` | `options carteira` aceita múltiplos clientes (array no JSON) e itera sobre todos, gerando um `analise_<cliente>.xlsx` por cliente; `--saida` passa a ser a pasta de saída |
 | `0.3.0` | Análise de carteira (`options carteira`): covered call sobre ações descobertas, rolagem por prêmio restante baixo e buy-write em ativos não detidos; custo desacoplado do screener |
 | `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável; remoção do Monte Carlo |

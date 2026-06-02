@@ -254,7 +254,10 @@ def _analisar_covered_call(
             logger.info("[%s] Posição totalmente coberta (ou < 1 contrato).", pos.ativo)
             continue
 
-        df = processar_ativo(pos.ativo, provedor, config, preco_custo=pos.preco_medio)
+        df = processar_ativo(
+            pos.ativo, provedor, config, preco_custo=pos.preco_medio,
+            excluir_prejuizo_exercicio=not carteira.permitir_strike_abaixo_custo,
+        )
         if df.empty:
             continue
 
@@ -444,7 +447,8 @@ _COLS_COVERED = [
     "ativo", "contratos_sugeridos", "ranking_ativo", "strike", "premio",
     "expiration", "dias_uteis_ate_vencimento", "prob_exercicio_final",
     "delta", "retorno_anualizado_liquido", "retorno_sobre_custo",
-    "capital_por_contrato", "alerta_abaixo_custo", "score_venda",
+    "capital_por_contrato", "custo_exercicio_contrato", "lucro_se_exercido",
+    "alerta_abaixo_custo", "score_venda",
 ]
 _COLS_ROLAGEM = [
     "ativo", "acao", "strike_atual", "venc_atual", "contratos", "premio_recebido",
@@ -456,7 +460,7 @@ _COLS_BUYWRITE = [
     "ranking_global", "ativo", "strike", "premio", "expiration",
     "dias_uteis_ate_vencimento", "prob_exercicio_final", "delta",
     "retorno_anualizado_liquido", "preco_atual_ativo", "capital_por_contrato",
-    "score_venda",
+    "custo_exercicio_contrato", "lucro_se_exercido", "score_venda",
 ]
 
 
