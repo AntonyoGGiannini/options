@@ -130,3 +130,54 @@ def test_custo_alto_exclui_por_prejuizo_no_exercicio(pasta_mock):
     df2 = processar_ativo("IBIT", provedor, config, excluir_prejuizo_exercicio=False)
     assert not df2.empty
     assert (df2["lucro_se_exercido"] <= 0).all()
+
+
+_STATUS_VALIDOS = {
+    "fora do filtro de liquidez",
+    "fora do filtro de probabilidade de exercicio",
+    "fora dos filtros (retorno/strike/lucro)",
+    "ok",
+}
+
+
+def test_matriz_inclui_todas_e_marca_status(pasta_mock):
+    """A matriz traz todas as candidatas (>= selecionadas), com status válido,
+    e toda opção 'ok' aparece no resultado selecionado."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=3, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    matriz: list[pd.DataFrame] = []
+    df_final = executar(config, matriz_out=matriz)
+    assert matriz, "a matriz deve ser coletada"
+    df_matriz = pd.concat(matriz, ignore_index=True)
+
+    assert "status" in df_matriz.columns
+    assert set(df_matriz["status"].unique()).issubset(_STATUS_VALIDOS)
+    # matriz é o universo completo; o ranking é um recorte (top_n) das 'ok'.
+    assert len(df_matriz) >= len(df_final)
+
+    # toda opção 'ok' (por strike+expiration) deve ter passado nos filtros, e o
+    # ranking final é um subconjunto desse universo aprovado.
+    ok = df_matriz[df_matriz["status"] == "ok"]
+    chaves_ok = set(zip(ok["strike"], ok["expiration"].astype(str)))
+    chaves_final = set(zip(df_final["strike"], df_final["expiration"].astype(str)))
+    assert chaves_final.issubset(chaves_ok)
+
+
+def test_matriz_status_probabilidade(pasta_mock):
+    """Com prob_exerc_max muito baixo, surgem reprovações por probabilidade e
+    nenhuma opção fica 'ok'."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.0,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    matriz: list[pd.DataFrame] = []
+    df_final = executar(config, matriz_out=matriz)
+    assert df_final.empty
+    df_matriz = pd.concat(matriz, ignore_index=True)
+    status = set(df_matriz["status"].unique())
+    assert "ok" not in status
+    assert "fora do filtro de probabilidade de exercicio" in status

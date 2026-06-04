@@ -48,6 +48,13 @@ class Config:
     # -0.05 = permite até 5% ITM). Default 0.0 mantém comportamento anterior (OTM).
     min_distancia_strike_pct: float = 0.0
 
+    # --- filtro de liquidez ---
+    # Limiares de liquidez da cadeia de opções. Não descartam mais a opção: o
+    # pipeline calcula a flag passou_liquidez e o ranking a usa como condição.
+    liquidez_volume_min: int = 100
+    liquidez_open_interest_min: int = 500
+    liquidez_spread_max: float = 0.15
+
     # --- custos ---
     tamanho_contrato: int = 100
     custo_compra: float = 0.0
@@ -73,6 +80,8 @@ class Config:
 
     # --- saída ---
     arquivo_excel: str = "top_opcoes_covered_call.xlsx"
+    # matriz completa de candidatas (todas as opções, com coluna de status)
+    arquivo_matriz: str = "matriz_opcoes.xlsx"
 
     def __post_init__(self) -> None:
         self.validar()
@@ -100,6 +109,10 @@ class Config:
             raise ValueError("intervalo de dias inválido (min_dias/max_dias)")
         if self.min_distancia_strike_pct < -1.0:
             raise ValueError("min_distancia_strike_pct não pode ser menor que -1.0")
+        if self.liquidez_volume_min < 0 or self.liquidez_open_interest_min < 0:
+            raise ValueError("limiares de liquidez (volume/open interest) não podem ser negativos")
+        if self.liquidez_spread_max < 0:
+            raise ValueError("liquidez_spread_max não pode ser negativo")
         if self.tamanho_contrato <= 0:
             raise ValueError("tamanho_contrato deve ser > 0")
         if self.custo_compra < 0 or self.custo_venda < 0 or self.custo_exercicio < 0:

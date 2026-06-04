@@ -41,16 +41,48 @@ COLUNAS_OUTPUT = [
 ]
 
 
+COLUNAS_MATRIZ = [
+    "ativo",
+    "strike",
+    "expiration",
+    "dias_uteis_ate_vencimento",
+    "prob_exercicio",
+    "prob_empirica",
+    "prob_exercicio_final",
+    "premio",
+    "retorno_anualizado_pct",
+    "retorno_anualizado_liquido",
+    "volume",
+    "openInterest",
+    "spread_pct",
+    "passou_liquidez",
+    "status",
+]
+
+
 def montar_output(df_final: pd.DataFrame) -> pd.DataFrame:
     """Seleciona as colunas de saída presentes no DataFrame."""
     colunas = [c for c in COLUNAS_OUTPUT if c in df_final.columns]
     return df_final[colunas].copy()
 
 
+def montar_matriz_output(df_matriz: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona as colunas da matriz completa presentes no DataFrame."""
+    colunas = [c for c in COLUNAS_MATRIZ if c in df_matriz.columns]
+    return df_matriz[colunas].copy()
+
+
 def salvar_excel(df_output: pd.DataFrame, caminho: str) -> str:
     """Salva o ranking em Excel."""
     df_output.to_excel(caminho, index=False)
     logger.info("Resultados salvos em: %s", caminho)
+    return caminho
+
+
+def salvar_matriz_completa(df_matriz: pd.DataFrame, caminho: str) -> str:
+    """Salva a matriz completa de candidatas (com coluna status) em Excel."""
+    df_matriz.to_excel(caminho, index=False)
+    logger.info("Matriz completa salva em: %s", caminho)
     return caminho
 
 

@@ -31,6 +31,13 @@ max_dias    = 20
 # 0.0 = apenas OTM (padrão). Valores negativos permitem ITM, ex.: -0.05 = até 5% ITM.
 min_distancia_strike_pct = 0.0
 
+# --- filtro de liquidez ---
+# Limiares de liquidez. Não descartam mais a opção: viram a flag passou_liquidez,
+# usada como condição do ranking e exibida na matriz completa (coluna status).
+liquidez_volume_min        = 100
+liquidez_open_interest_min = 500
+liquidez_spread_max        = 0.15
+
 # --- custos (USD por contrato) ---
 tamanho_contrato = 100
 custo_compra     = 0.00
@@ -52,6 +59,8 @@ pasta_cache    = ".cache"
 
 # --- saída ---
 arquivo_excel = "top_opcoes_covered_call.xlsx"
+# matriz completa de candidatas (todas as opções, com coluna de status)
+arquivo_matriz = "matriz_opcoes.xlsx"
 
 # Preço médio de aquisição (opcional, apenas para gráfico de payoff). Quando informado, a operação é classificada
 # como "covered_call" e o retorno_sobre_custo reflete o custo real da posição;

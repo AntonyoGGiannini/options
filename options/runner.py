@@ -12,7 +12,13 @@ from options.data.mock_provider import ProvedorMock
 from options.data.yfinance_provider import ProvedorYFinance
 from options.logging_setup import obter_logger
 from options.ranking import processar_ativo
-from options.report import gerar_grafico_melhor, montar_output, salvar_excel
+from options.report import (
+    gerar_grafico_melhor,
+    montar_matriz_output,
+    montar_output,
+    salvar_excel,
+    salvar_matriz_completa,
+)
 
 logger = obter_logger(__name__)
 
@@ -29,8 +35,16 @@ def construir_provedor(config: Config) -> ProvedorDados:
     return ProvedorYFinance(cache=cache)
 
 
-def executar(config: Config, provedor: ProvedorDados | None = None) -> pd.DataFrame:
-    """Processa todos os ativos da config e retorna o ranking consolidado."""
+def executar(
+    config: Config,
+    provedor: ProvedorDados | None = None,
+    matriz_out: list[pd.DataFrame] | None = None,
+) -> pd.DataFrame:
+    """Processa todos os ativos da config e retorna o ranking consolidado.
+
+    matriz_out: se fornecido, recebe (extend) a matriz completa de candidatas de
+    todos os ativos, com a coluna ``status`` por opção.
+    """
     if provedor is None:
         provedor = construir_provedor(config)
 
@@ -40,6 +54,7 @@ def executar(config: Config, provedor: ProvedorDados | None = None) -> pd.DataFr
         df_top = processar_ativo(
             ativo, provedor, config,
             salvar_mock=config.salvar_mock and not config.modo_offline,
+            matriz_out=matriz_out,
         )
         if not df_top.empty:
             resultados.append(df_top)
@@ -53,7 +68,15 @@ def executar(config: Config, provedor: ProvedorDados | None = None) -> pd.DataFr
 
 def executar_e_reportar(config: Config, provedor: ProvedorDados | None = None) -> pd.DataFrame:
     """Executa a análise, imprime o resumo, salva Excel e gera o gráfico."""
-    df_final = executar(config, provedor)
+    matriz: list[pd.DataFrame] = []
+    df_final = executar(config, provedor, matriz_out=matriz)
+
+    # matriz completa (todas as candidatas, com status) — gerada mesmo quando
+    # nenhuma opção é selecionada.
+    if matriz:
+        df_matriz = montar_matriz_output(pd.concat(matriz, ignore_index=True))
+        salvar_matriz_completa(df_matriz, config.arquivo_matriz)
+
     if df_final.empty:
         return df_final
 
