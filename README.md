@@ -239,6 +239,22 @@ As colunas de custo (`retorno_sobre_custo`, `capital_por_contrato`,
 O terminal imprime a tabela e o resumo da melhor call geral, e um gráfico de
 payoff (`payoff_<ATIVO>.png`) é gerado para a melhor opção.
 
+### Matriz completa
+
+Além do ranking acima, é gerado `matriz_opcoes.xlsx` (configurável em
+`arquivo_matriz`) com **todas** as opções candidatas — inclusive as reprovadas
+nos filtros de liquidez e probabilidade — e uma coluna `status` por opção:
+
+| `status` | Significado |
+|---|---|
+| `fora do filtro de liquidez` | Reprovada por volume/open interest/spread |
+| `fora do filtro de probabilidade de exercicio` | `prob_exercicio_final > prob_exerc_max` |
+| `fora dos filtros (retorno/strike/lucro)` | Passa liquidez e probabilidade, mas falha em retorno > 0, distância de strike ou lucro no exercício |
+| `ok` | Passou em todos os filtros (subconjunto que alimenta o ranking) |
+
+Os limiares de liquidez (`liquidez_volume_min`, `liquidez_open_interest_min`,
+`liquidez_spread_max`) são configuráveis.
+
 ---
 
 ## Estrutura

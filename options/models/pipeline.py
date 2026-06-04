@@ -41,6 +41,9 @@ def preparar_calls_para_modelo(
     usar_prob_d2=True,
     usar_prob_empirica=True,
     min_amostras_empirica=30,
+    liquidez_volume_min=100,
+    liquidez_open_interest_min=500,
+    liquidez_spread_max=0.15,
 ):
     """
     Calcula métricas de contrato por cadeia de opções.
@@ -58,6 +61,12 @@ def preparar_calls_para_modelo(
         return df_calls.copy()
 
     df = df_calls.copy()
+
+    # garante colunas de liquidez (robustez para mocks/dados sem mid/spread_pct)
+    if "mid" not in df.columns:
+        df["mid"] = (df["bid"] + df["ask"]) / 2
+    if "spread_pct" not in df.columns:
+        df["spread_pct"] = (df["ask"] - df["bid"]) / df["mid"]
 
     df["preco_atual"] = preco_atual
     df["dias_vencimento"] = (
@@ -84,6 +93,13 @@ def preparar_calls_para_modelo(
     df["rendimento"] = df["premio"] / preco_atual
 
     df = df[(df["dias_vencimento"] >= t_min) & (df["dias_vencimento"] <= t_max)].copy()
+
+    # --- liquidez: flag (não descarta) para o ranking e a matriz completa ---
+    df["passou_liquidez"] = (
+        (df["volume"] >= liquidez_volume_min)
+        & (df["openInterest"] >= liquidez_open_interest_min)
+        & (df["spread_pct"] <= liquidez_spread_max)
+    )
 
     # --- volatilidade efetiva: IV implícita com fallback para vol histórica ---
     iv = df["impliedVolatility"].to_numpy(dtype=float)

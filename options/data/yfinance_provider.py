@@ -16,8 +16,9 @@ logger = obter_logger(__name__)
 class ProvedorYFinance:
     """Obtém preço, cadeia de opções e histórico via yfinance.
 
-    Aplica filtros de liquidez na cadeia de opções e, opcionalmente, usa um
-    cache em disco com TTL para evitar chamadas repetidas à API.
+    Mantém todas as opções da cadeia (a liquidez é avaliada como flag no
+    pipeline, não mais descartada aqui) e, opcionalmente, usa um cache em disco
+    com TTL para evitar chamadas repetidas à API.
     """
 
     def __init__(self, cache: CacheDisco | None = None) -> None:
@@ -79,11 +80,6 @@ class ProvedorYFinance:
                     calls = ticker.option_chain(expiration).calls.copy()
                     calls["mid"] = (calls["bid"] + calls["ask"]) / 2
                     calls["spread_pct"] = (calls["ask"] - calls["bid"]) / calls["mid"]
-                    calls = calls[
-                        (calls["volume"] >= 100)
-                        & (calls["openInterest"] >= 500)
-                        & (calls["spread_pct"] <= 0.15)
-                    ].copy()
                     calls["ativo"] = ativo
                     calls["expiration"] = expiration
                     calls["type"] = "CALL"

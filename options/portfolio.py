@@ -400,8 +400,17 @@ def _melhor_roll(
 
     venc_atual = pd.Timestamp(call.expiration)
     piso_strike = max(call.strike, preco_medio or 0.0)
+    # liquidez voltou a ser flag (não é mais descartada no provedor): exige
+    # passou_liquidez aqui, como o ranking principal faz, para não sugerir roll
+    # em opções ilíquidas. Mocks sem a coluna são tratados como líquidos.
+    passou_liquidez = (
+        df["passou_liquidez"]
+        if "passou_liquidez" in df.columns
+        else pd.Series(True, index=df.index)
+    )
     cand = df[
-        (pd.to_datetime(df["expiration"]) > venc_atual)
+        passou_liquidez
+        & (pd.to_datetime(df["expiration"]) > venc_atual)
         & (df["strike"] >= piso_strike)
         & (df["prob_exercicio_final"] <= config.prob_exerc_max)
         & (df["premio"] > 0)

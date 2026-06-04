@@ -20,6 +20,7 @@ def rankear_calls(
     preco_atual: float,
     preco_custo: float | None = None,
     excluir_prejuizo_exercicio: bool = True,
+    matriz_out: list[pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     """Aplica custos, filtros e score, retornando as top-N opções ranqueadas.
 
@@ -34,6 +35,11 @@ def rankear_calls(
     O lucro no exercício considera a venda das ações pelo strike, o prêmio e os
     custos de venda e de exercício (e de compra, no buy-write). A base de custo é
     o preço médio do cliente (se informado) ou o preço de mercado (buy-write).
+
+    matriz_out: se fornecido, recebe (append) o DataFrame completo de candidatas
+    — todas as opções da janela, com a coluna ``status`` indicando o motivo de
+    reprovação ou ``"ok"``. Coletado antes de qualquer recorte, inclusive quando
+    nenhuma opção passa nos filtros.
     """
     custo_venda_por_acao = config.custo_venda / config.tamanho_contrato
 
@@ -71,13 +77,43 @@ def rankear_calls(
         - custo_compra_por_acao
     )
 
-    condicoes = (
-        (df["distancia_strike_pct"] >= config.min_distancia_strike_pct)
-        & (df["prob_exercicio_final"] <= config.prob_exerc_max)
-        & (df["retorno_anualizado_liquido"] > 0)
+    # liquidez vira condição do ranking (antes as ilíquidas eram descartadas no
+    # provedor). Mocks/dados sem a coluna são tratados como líquidos.
+    passou_liquidez = (
+        df["passou_liquidez"]
+        if "passou_liquidez" in df.columns
+        else pd.Series(True, index=df.index)
     )
-    if excluir_prejuizo_exercicio:
-        condicoes &= df["lucro_se_exercido"] > 0
+
+    cond_prob = df["prob_exercicio_final"] <= config.prob_exerc_max
+    cond_strike = df["distancia_strike_pct"] >= config.min_distancia_strike_pct
+    cond_retorno = df["retorno_anualizado_liquido"] > 0
+    cond_lucro = (
+        df["lucro_se_exercido"] > 0
+        if excluir_prejuizo_exercicio
+        else pd.Series(True, index=df.index)
+    )
+
+    condicoes = passou_liquidez & cond_prob & cond_strike & cond_retorno & cond_lucro
+
+    # status por precedência (primeiro motivo de reprovação vence)
+    df["status"] = np.select(
+        [
+            ~passou_liquidez,
+            ~cond_prob,
+            ~(cond_strike & cond_retorno & cond_lucro),
+        ],
+        [
+            "fora do filtro de liquidez",
+            "fora do filtro de probabilidade de exercicio",
+            "fora dos filtros (retorno/strike/lucro)",
+        ],
+        default="ok",
+    )
+
+    if matriz_out is not None:
+        matriz_out.append(df.copy())
+
     df_filtrado = df[condicoes].copy()
 
     if df_filtrado.empty:
@@ -125,6 +161,7 @@ def processar_ativo(
     salvar_mock: bool = False,
     preco_custo: float | None = None,
     excluir_prejuizo_exercicio: bool = True,
+    matriz_out: list[pd.DataFrame] | None = None,
 ) -> pd.DataFrame:
     """Obtém dados, calcula probabilidades, filtra e ranqueia um ativo.
 
@@ -134,6 +171,9 @@ def processar_ativo(
 
     excluir_prejuizo_exercicio: repassado a ``rankear_calls`` — descarta
     operações que dariam prejuízo se a call fosse exercida (padrão True).
+
+    matriz_out: se fornecido, recebe (extend) a matriz completa de candidatas do
+    ativo, já com a coluna ``ativo``. Coletada mesmo quando nada passa nos filtros.
 
     Retorna DataFrame vazio (com aviso em log) em caso de erro ou ausência de
     opções, para não interromper o processamento dos demais ativos.
@@ -166,14 +206,23 @@ def processar_ativo(
             usar_prob_d2=config.usar_prob_d2,
             usar_prob_empirica=config.usar_prob_empirica,
             min_amostras_empirica=config.min_amostras_empirica,
+            liquidez_volume_min=config.liquidez_volume_min,
+            liquidez_open_interest_min=config.liquidez_open_interest_min,
+            liquidez_spread_max=config.liquidez_spread_max,
         )
 
         if preco_custo is None:
             preco_custo = config.preco_custo_para(ativo)
+        matriz_local: list[pd.DataFrame] = []
         df_top = rankear_calls(
             df, config, dados.preco_atual, preco_custo=preco_custo,
             excluir_prejuizo_exercicio=excluir_prejuizo_exercicio,
+            matriz_out=matriz_local if matriz_out is not None else None,
         )
+        if matriz_out is not None:
+            for m in matriz_local:
+                m["ativo"] = ativo
+            matriz_out.extend(matriz_local)
         if df_top.empty:
             logger.info("[%s] Nenhuma opção passou nos filtros (prob/prazo/retorno).", ativo)
             return pd.DataFrame()
