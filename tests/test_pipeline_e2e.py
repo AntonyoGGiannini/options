@@ -161,8 +161,10 @@ def test_matriz_inclui_todas_e_marca_status(pasta_mock):
     # toda opção 'ok' (por strike+expiration) deve ter passado nos filtros, e o
     # ranking final é um subconjunto desse universo aprovado.
     ok = df_matriz[df_matriz["status"] == "ok"]
-    chaves_ok = set(zip(ok["strike"], ok["expiration"].astype(str)))
-    chaves_final = set(zip(df_final["strike"], df_final["expiration"].astype(str)))
+    chaves_ok = set(zip(ok["strike"], ok["expiration"].astype(str), strict=False))
+    chaves_final = set(
+        zip(df_final["strike"], df_final["expiration"].astype(str), strict=False)
+    )
     assert chaves_final.issubset(chaves_ok)
 
 
