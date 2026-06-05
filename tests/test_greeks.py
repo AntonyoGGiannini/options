@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from options.models.black_scholes import preco_call_bs
-from options.models.greeks import calcular_greeks_call
+from allocation.models.black_scholes import preco_call_bs
+from allocation.models.greeks import calcular_greeks_call
 
 
 def test_delta_em_faixa_e_atm_proximo_de_meio():

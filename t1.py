@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from options.cli import main
+from allocation.cli import main
 
 if __name__ == "__main__":
     argv = list(sys.argv[1:])

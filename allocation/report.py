@@ -1,0 +1,123 @@
+"""Geração de relatórios: tabela, Excel e gráfico de payoff."""
+
+from __future__ import annotations
+
+import pandas as pd
+
+from allocation.config import Config
+from allocation.logging_setup import obter_logger
+from allocation.models.payoff import gerar_grafico_payoff_covered_call
+
+logger = obter_logger(__name__)
+
+COLUNAS_OUTPUT = [
+    "ativo",
+    "ranking_ativo",
+    "strike",
+    "premio",
+    "expiration",
+    "dias_uteis_ate_vencimento",
+    "prob_exercicio",
+    "prob_empirica",
+    "prob_exercicio_final",
+    "delta",
+    "theta",
+    "vega",
+    "fonte_vol",
+    "risco_atribuicao_antecipada",
+    "alerta_abaixo_custo",
+    "retorno_anualizado_pct",
+    "retorno_anualizado_liquido",
+    "retorno_se_exercido_anualizado",
+    "downside_protection",
+    "retorno_sobre_custo",
+    "capital_por_contrato",
+    "custo_exercicio_contrato",
+    "lucro_se_exercido",
+    "bid",
+    "ask",
+    "volume",
+    "openInterest",
+    "preco_atual_ativo",
+    "score_venda",
+]
+
+
+COLUNAS_MATRIZ = [
+    "ativo",
+    "strike",
+    "expiration",
+    "dias_uteis_ate_vencimento",
+    "prob_exercicio",
+    "prob_empirica",
+    "prob_exercicio_final",
+    "premio",
+    "retorno_anualizado_pct",
+    "retorno_anualizado_liquido",
+    "retorno_se_exercido_anualizado",
+    "downside_protection",
+    "volume",
+    "openInterest",
+    "spread_pct",
+    "passou_liquidez",
+    "status",
+]
+
+
+def montar_output(df_final: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona as colunas de saída presentes no DataFrame."""
+    colunas = [c for c in COLUNAS_OUTPUT if c in df_final.columns]
+    return df_final[colunas].copy()
+
+
+def montar_matriz_output(df_matriz: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona as colunas da matriz completa presentes no DataFrame."""
+    colunas = [c for c in COLUNAS_MATRIZ if c in df_matriz.columns]
+    return df_matriz[colunas].copy()
+
+
+def salvar_excel(df_output: pd.DataFrame, caminho: str) -> str:
+    """Salva o ranking em Excel."""
+    df_output.to_excel(caminho, index=False)
+    logger.info("Resultados salvos em: %s", caminho)
+    return caminho
+
+
+def salvar_matriz_completa(df_matriz: pd.DataFrame, caminho: str) -> str:
+    """Salva a matriz completa de candidatas (com coluna status) em Excel."""
+    df_matriz.to_excel(caminho, index=False)
+    logger.info("Matriz completa salva em: %s", caminho)
+    return caminho
+
+
+def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
+    """Gera o gráfico de payoff da melhor opção geral (maior score)."""
+    if df_final.empty:
+        return None
+
+    melhor = df_final.sort_values("score_venda", ascending=False).iloc[0]
+    ativo_melhor = melhor["ativo"]
+    preco_custo = config.preco_custo_para(ativo_melhor)
+
+    prob_emp = melhor.get("prob_empirica")
+    prob_emp_str = f"{prob_emp:.2%}" if prob_emp is not None and not pd.isna(prob_emp) else "N/A"
+    logger.info(
+        "Melhor opção geral: %s | Strike %s | Venc. %s | Score %.4f | "
+        "Prob. final %.2f%% (d2=%.2f%%, empírica=%s)",
+        ativo_melhor, melhor["strike"], melhor["expiration"], melhor["score_venda"],
+        melhor["prob_exercicio_final"] * 100, melhor["prob_exercicio"] * 100, prob_emp_str,
+    )
+
+    arquivo = gerar_grafico_payoff_covered_call(
+        preco_atual=melhor["preco_atual_ativo"],
+        strike=melhor["strike"],
+        premio=melhor["premio"],
+        expiration=melhor["expiration"],
+        preco_custo=preco_custo,
+        arquivo_saida=f"payoff_{ativo_melhor}.png",
+        custo_exercicio_contrato=config.custo_exercicio_para(melhor["strike"]),
+        custo_venda_contrato=config.custo_venda,
+        tamanho_contrato=config.tamanho_contrato,
+    )
+    logger.info("Gráfico de payoff salvo em: %s", arquivo)
+    return arquivo

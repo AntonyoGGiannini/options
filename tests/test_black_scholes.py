@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.stats import norm
 
-from options.models.black_scholes import (
+from allocation.models.black_scholes import (
     calcular_prob_exercicio_risk_neutral,
     calcular_prob_exercicio_risk_neutral_vetor,
 )

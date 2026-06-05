@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from options.config import Config
+from allocation.config import Config
 
 
 def test_defaults_validos():

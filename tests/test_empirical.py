@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from options.models.empirical import calcular_probabilidade_empirica_batch
+from allocation.models.empirical import calcular_probabilidade_empirica_batch
 
 
 def test_historico_curto_nao_usa_empirica():

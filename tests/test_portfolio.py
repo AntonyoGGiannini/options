@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from options.config import Config
-from options.data.mock_provider import ProvedorMock
-from options.portfolio import (
+from allocation.config import Config
+from allocation.data.mock_provider import ProvedorMock
+from allocation.risco.portfolio import (
     CallVendida,
     Carteira,
     PosicaoAcao,

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`options` is a quantitative finance tool for screening and ranking **covered call** opportunities on US equities/ETFs. It combines Black-Scholes d2 (risk-neutral) and empirical (historical frequency) probability-of-exercise models with a realistic brokerage cost model to score and rank option chains.
+`allocation` is a modular quantitative finance platform. The core module (`opcoes`) screens and ranks covered call opportunities on US equities/ETFs using Black-Scholes d2 (risk-neutral) and empirical (historical frequency) probability models combined with a realistic brokerage cost model.
 
 ## Commands
 
@@ -13,48 +13,75 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pip install -e ".[dev]"
 
 # Run the screener
-options --config config.toml
+allocation --config config.toml
 python3 t1.py                          # legacy alias
 
 # CLI overrides
-options --config config.toml --ativos IBIT,AAPL --top-n 3
-options --offline --pasta-mock ./base_mock   # use saved mock data
-options --config config.toml --salvar-mock --pasta-mock ./base_mock  # save mock
+allocation --config config.toml --ativos IBIT,AAPL --top-n 3
+allocation --offline --pasta-mock ./base_mock   # use saved mock data
+allocation --config config.toml --salvar-mock --pasta-mock ./base_mock  # save mock
 
 # Subcommands
-options --config config.toml backtest --distancia 0.05 --dias 14
-options --offline carteira --arquivo exemplo_carteira.json --saida ./relatorios
+allocation --config config.toml backtest --distancia 0.05 --dias 14
+allocation --offline carteira --arquivo exemplo_carteira.json --saida ./relatorios
 
 # Tests
-pytest                                 # all tests
-pytest tests/test_black_scholes.py    # single file
-pytest -v                             # verbose
+python3 -m pytest                      # all tests (use python3 -m pytest, not bare pytest)
+python3 -m pytest tests/test_black_scholes.py   # single file
+python3 -m pytest -v                   # verbose
 
 # Lint & type-check
 ruff check .
 ruff format .
-mypy options
+mypy allocation
 ```
 
 ## Architecture
 
-The codebase is organized in strict layers with no upward dependencies:
+Strict layered dependency — no upward imports:
 
 ```
 CLI (cli.py)
-  └─ Config (config.py)          — validated TOML dataclass, all runtime params
-  └─ Runner (runner.py)          — outer loop: per-asset orchestration
-       └─ Data Layer (data/)     — ProvedorDados protocol, swappable yfinance ↔ mock
-       └─ Pipeline (models/pipeline.py) — vectorized batch computation of 30+ metrics
-       └─ Ranking (ranking.py)   — filter chain → scoring → top-N
-       └─ Report (report.py)     — Excel + payoff graph generation
-       └─ Portfolio (portfolio.py) — multi-client covered_call/roll/buy-write analysis
-       └─ Backtest (backtest.py) — historical strategy simulation
+  └─ Config (config.py)               — validated TOML dataclass, all runtime params
+  └─ Runner (runner.py)               — outer loop: per-asset orchestration
+       └─ Data Layer (data/)          — ProvedorDados protocol, swappable yfinance ↔ mock
+       └─ opcoes/pipeline.py          — vectorized batch computation of 30+ metrics
+       └─ opcoes/calls.py             — filter chain → scoring → top-N
+       └─ report.py                   — Excel + payoff graph generation
+       └─ risco/portfolio.py          — multi-client covered_call/roll/buy-write analysis
+       └─ opcoes/backtest.py          — historical strategy simulation
+```
+
+### Module layout
+
+```
+allocation/
+├── opcoes/           — everything that uses option chains + Black-Scholes
+│   ├── calls.py      — covered call ranking (core, formerly ranking.py)
+│   ├── pipeline.py   — vectorized 30+ metric batch (formerly models/pipeline.py)
+│   ├── backtest.py   — historical covered call simulation
+│   ├── puts.py       — cash-secured/naked put selling [stub]
+│   ├── spreads.py    — multi-leg: bull spread, iron condor [stub]
+│   ├── volatilidade.py — IV rank, term structure, skew [stub]
+│   └── hedge.py      — collar, protective put, beta hedge [stub]
+├── acoes/
+│   └── screening.py  — fundamentals + momentum stock screening [stub]
+├── risco/
+│   ├── portfolio.py  — multi-client analysis (formerly portfolio.py)
+│   ├── analytics.py  — Greeks aggregation, VaR, drawdown, stress test [stub]
+│   ├── montecarlo.py — GBM portfolio simulation [stub]
+│   └── crises.py     — replay against historical crises [stub]
+├── data/             — shared: ProvedorDados protocol, yfinance, mock, cache, retry
+├── models/           — shared pure math: black_scholes, empirical, greeks, volatility, payoff
+├── config.py         — validated TOML dataclass
+├── runner.py         — orchestrator
+├── report.py         — Excel + chart output
+└── cli.py            — argument parsing, subcommand routing
 ```
 
 **Data abstraction:** `data/base.py` defines `ProvedorDados` (protocol) and `DadosMercado` (container). `ProvedorYFinance` (online, disk-cached) and `ProvedorMock` (CSV/JSON files) are interchangeable — no model or ranking code touches the provider directly.
 
-**Pipeline:** `models/pipeline.py:preparar_calls_para_modelo()` is the core — a single-pass vectorized function that computes all 30+ per-option metrics (probabilities, Greeks, costs, returns) from raw chain data. Adding a new metric belongs here.
+**Pipeline:** `opcoes/pipeline.py:preparar_calls_para_modelo()` is the core — a single-pass vectorized function that computes all 30+ per-option metrics. Adding a new metric belongs here.
 
 **Probability model:** Final probability = `max(prob_d2, prob_empirica)` (conservative worst-case). d2 from Black-Scholes in `models/black_scholes.py`; empirical from non-overlapping historical windows in `models/empirical.py`.
 
@@ -68,7 +95,7 @@ CLI (cli.py)
 
 **Volatility fallback:** IV from yfinance is preferred; if unavailable, realized historical vol is used and `fonte_vol` is set to `"historica"` vs `"implicita"`.
 
-**Filter order in `ranking.py`:** Liquidity → probability cap → strike distance → positive net return → positive profit-if-exercised. Rejected options are kept in the full matrix with a `status` column explaining rejection reason.
+**Filter order in `opcoes/calls.py`:** Liquidity → probability cap → strike distance → positive net return → positive profit-if-exercised. Rejected options are kept in the full matrix with a `status` column explaining rejection reason.
 
 **Mock data:** `base_mock/` contains pre-downloaded CSV/JSON for 23 tickers used in offline mode and tests. Tests use fixtures from `tests/conftest.py` pointing to this directory.
 
@@ -83,6 +110,8 @@ IBIT = 55.00
 
 **Outputs:** The screener writes `top_opcoes_covered_call.xlsx` (ranked results) and `matriz_opcoes.xlsx` (full matrix with rejection reasons). Portfolio analysis writes one Excel per client with three sheets: `covered_call`, `rolagem`, `buy_write`.
 
+**Running tests:** Always use `python3 -m pytest` (not bare `pytest`) to ensure the correct Python environment picks up the installed package.
+
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main` and all PRs: `ruff check` → `mypy options` → `pytest`, on Python 3.11 and 3.12.
+GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main` and all PRs: `ruff check` → `mypy allocation` → `pytest`, on Python 3.11 and 3.12.
