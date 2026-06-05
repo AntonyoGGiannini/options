@@ -77,6 +77,12 @@ def rankear_calls(
         - custo_compra_por_acao
     )
 
+    # retorno se a call for exercida e as ações entregues ao strike, anualizado
+    df["retorno_se_exercido_anualizado"] = df["lucro_se_exercido"] / df["preco_atual"] / df["T"]
+
+    # downside protection: quanto o ativo pode cair antes do break-even (não anualizado)
+    df["downside_protection"] = df["premio"] / df["preco_atual"]
+
     # liquidez vira condição do ranking (antes as ilíquidas eram descartadas no
     # provedor). Mocks/dados sem a coluna são tratados como líquidos.
     passou_liquidez = (
@@ -130,7 +136,7 @@ def rankear_calls(
     ).clip(lower=0)
 
     df_filtrado["score_venda"] = (
-        df_filtrado["retorno_anualizado_liquido"]
+        df_filtrado["retorno_se_exercido_anualizado"]
         * (1 - df_filtrado["prob_exercicio_final"])
         * (1 + config.peso_theta * theta_eff)
         / (1 + config.peso_vega * vega_risk)
