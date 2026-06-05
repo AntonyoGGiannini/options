@@ -1,9 +1,6 @@
-# Options
+# allocation
 
-Ferramenta quantitativa para análise e ranking de **covered calls** e oportunidades
-de **buy-write** em ETFs e ações americanas. Combina duas estimativas de probabilidade
-de exercício e custos de corretagem para identificar a melhor opção a vender dado o
-perfil de risco do usuário.
+Plataforma quantitativa modular para análise de portfólio e estratégias de opções em ETFs e ações americanas. O módulo principal (`opcoes`) combina duas estimativas de probabilidade de exercício e custos de corretagem para identificar as melhores covered calls e buy-writes dado o perfil de risco do usuário.
 
 ---
 
@@ -19,13 +16,16 @@ Para cada call disponível no mercado, o modelo calcula:
 
 2. **Retorno líquido** descontando os custos de corretagem da venda
 
-3. **Score de ranking**: `retorno_anualizado_liquido × (1 - prob_exercicio_final)`
+3. **Score de ranking:**
+   ```
+   score_venda = retorno_se_exercido_anualizado
+               × (1 − prob_exercicio_final)
+               × (1 + peso_theta × theta_eff)
+               / (1 + peso_vega × vega_risk)
+   ```
+   Com `peso_theta = peso_vega = 0` (default), reduz a `retorno_se_exercido × (1 − prob)`.
 
-Para cada contrato também são calculados os **Greeks** (delta, gamma, vega,
-theta, rho). Quando a volatilidade implícita está ausente/inválida, usa-se a
-**volatilidade realizada** histórica como fallback (`fonte_vol`). O
-`dividend_yield` pode ser único ou **por ativo**, e contratos com dividendo e
-delta alto recebem flag de **risco de atribuição antecipada**.
+Para cada contrato também são calculados os **Greeks** (delta, gamma, vega, theta, rho). Quando a volatilidade implícita está ausente/inválida, usa-se a **volatilidade realizada** histórica como fallback (`fonte_vol`). O `dividend_yield` pode ser único ou **por ativo**, e contratos com dividendo e delta alto recebem flag de **risco de atribuição antecipada**.
 
 ### Screener vs. análise de posição existente
 
@@ -65,7 +65,7 @@ no filtro de lucro-se-exercido e é refletido no gráfico de payoff.
 ## Instalação
 
 ```bash
-pip install -e .          # instala o pacote e o comando `options`
+pip install -e .          # instala o pacote e o comando `allocation`
 # ou, só as dependências de runtime:
 pip install -r requirements.txt
 ```
@@ -83,15 +83,15 @@ pip install -e ".[dev]"
 A configuração é **declarativa**, em `config.toml`. Edite o arquivo e rode via CLI:
 
 ```bash
-options --config config.toml
+allocation --config config.toml
 ```
 
 Overrides rápidos pela linha de comando:
 
 ```bash
-options --config config.toml --ativos IBIT,AAPL --top-n 3
-options --offline                 # usa dados mock locais (sem internet)
-options --config config.toml --sem-cache -v
+allocation --config config.toml --ativos IBIT,AAPL --top-n 3
+allocation --offline                 # usa dados mock locais (sem internet)
+allocation --config config.toml --sem-cache -v
 ```
 
 O entrypoint legado continua funcionando (carrega `config.toml` automaticamente):
@@ -107,11 +107,23 @@ Valida a metodologia de seleção de strike sobre o histórico de preços. O pr�
 (backtest baseado em modelo — não usa cadeias de opções históricas):
 
 ```bash
-options --config config.toml backtest --distancia 0.05 --dias 14
+allocation --config config.toml backtest --distancia 0.05 --dias 14
+# argumentos completos
+allocation --config config.toml backtest --distancia 0.05 --dias 14 --janela-vol 60
 ```
 
 Reporta, por ativo: nº de trades, retorno médio/anualizado da covered call,
 taxa de exercício, taxa de acerto e comparação com buy & hold.
+
+| Coluna | Descrição |
+|---|---|
+| `n_trades` | Nº de trades simulados |
+| `retorno_medio_cc` | Retorno médio por trade |
+| `retorno_anualizado_cc` | Retorno anualizado da estratégia |
+| `taxa_exercicio` | % de trades em que a call foi exercida |
+| `taxa_acerto` | % de trades com retorno positivo |
+| `retorno_medio_buy_hold` | Retorno médio do ativo no período (benchmark) |
+| `vol_retorno_cc` | Volatilidade dos retornos da estratégia |
 
 ### Análise de carteira
 
@@ -131,45 +143,59 @@ do screener e gera três frentes de recomendação **por cliente**:
 
 ```bash
 # --saida é a PASTA de saída; gera um analise_<cliente>.xlsx por cliente
-options --offline carteira --arquivo mock_carteira.json --saida ./relatorios
-options carteira --arquivo carteira.json --limiar-premio-restante 0.25 --rolagem-max-dias 75
+allocation --offline carteira --arquivo exemplo_carteira.json --saida ./relatorios
+allocation carteira --arquivo carteira.json --limiar-premio-restante 0.25 --rolagem-max-dias 75
 ```
 
-O JSON aceita **um cliente** (objeto único, retrocompatível) ou **vários
-clientes** (array). Com array, a função itera sobre todos e gera um Excel por
-cliente. Formato (ver `mock_carteira.json` e `exemplo_carteira.json`):
+O JSON aceita **um cliente** (objeto único) ou **vários clientes** (array).
+Formato completo (ver `exemplo_carteira.json`):
 
 ```json
 [
   {
-    "cliente": "Cliente Exemplo",
-    "caixa": 20000,
-    "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
-    "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0, "expiration": "2026-06-18",
-                        "premio_recebido": 2.0, "contratos": 1}]
+    "cliente": "Nome do Cliente",
+    "caixa": 100000,
+    "posicoes": [
+      {"ativo": "AAPL", "quantidade": 300, "preco_medio": 180.0},
+      {"ativo": "NVDA", "quantidade": 200, "preco_medio": 95.0}
+    ],
+    "calls_vendidas": [
+      {"ativo": "AAPL", "strike": 210.0, "expiration": "2026-07-17",
+       "premio_recebido": 3.5, "contratos": 2}
+    ],
+    "limiar_premio_restante": 0.20,
+    "rolagem_min_dias": 21,
+    "rolagem_max_dias": 60,
+    "permitir_strike_abaixo_custo": false
   }
 ]
 ```
 
-Para cada cliente gera um Excel `analise_<cliente>.xlsx` (na pasta `--saida`) com
-três abas (`covered_call`, `rolagem`, `buy_write`) e imprime o resumo de cada
-frente no terminal. Os overrides de CLI (`--limiar-premio-restante`, etc.)
-aplicam-se a todos os clientes do arquivo.
+| Campo JSON | Obrigatório | Padrão | Descrição |
+|---|---|---|---|
+| `cliente` | não | — | Nome para nomear o arquivo de saída |
+| `caixa` | não | — | Caixa disponível (informativo) |
+| `posicoes[].ativo` / `.quantidade` / `.preco_medio` | sim | — | Posição em ações |
+| `calls_vendidas[].strike` / `.expiration` / `.premio_recebido` / `.contratos` | sim | — | Call já vendida |
+| `limiar_premio_restante` | não | `0.20` | Rolar quando prêmio restante < 20% |
+| `rolagem_min_dias` / `rolagem_max_dias` | não | `21` / `60` | Faixa de DTE do roll-out |
+| `permitir_strike_abaixo_custo` | não | `false` | Permite sugerir strikes abaixo do preço médio |
+
+Para cada cliente gera `analise_<cliente>.xlsx` com três abas (`covered_call`, `rolagem`, `buy_write`) e imprime o resumo no terminal.
 
 #### Base mock em pasta dedicada
 
-Para validar tudo offline com uma base salva uma única vez, use `--pasta-mock`
-apontando para uma pasta dedicada (mantém os `mock_<TICKER>_*` fora da raiz):
+Para validar tudo offline com uma base salva uma única vez:
 
 ```bash
 # 1) salva a base de todos os ativos da config (uma vez, com internet)
-options --config config.toml --salvar-mock --pasta-mock ./base_mock
+allocation --config config.toml --salvar-mock --pasta-mock ./base_mock
 
 # 2) tickers detidos na carteira que não estão na lista_ativos? salve-os também
-options --ativos NU,TSM --salvar-mock --pasta-mock ./base_mock
+allocation --ativos NU,TSM --salvar-mock --pasta-mock ./base_mock
 
 # 3) rode tudo offline a partir da base
-options --offline --pasta-mock ./base_mock carteira --arquivo exemplo_carteira.json
+allocation --offline --pasta-mock ./base_mock carteira --arquivo exemplo_carteira.json
 ```
 
 Salve o conjunto de tickers = `lista_ativos` ∪ ativos detidos ∪ ativos com calls
@@ -195,22 +221,19 @@ Black-Scholes), a base do ativo precisa conter o strike + vencimento da call ven
 | `custo_compra` / `custo_venda` | `0.00` | Custos por contrato (USD) |
 | `custo_exercicio_pct` / `custo_exercicio_min` | `0.0025` / `10.00` | Custo de exercício = `max(pct × strike × tamanho_contrato, mínimo)` |
 | `custo_exercicio` | `0.00` | Taxa fixa adicional de exercício por contrato (USD) |
+| `peso_theta` / `peso_vega` | `0.0` / `0.0` | Pesos dos Greeks no score (0 = ignora) |
 | `usar_cache` / `cache_ttl_horas` | `true` / `6.0` | Cache em disco dos dados de mercado |
 | `modo_offline` / `salvar_mock` | `false` | Usar/gerar dados mock locais |
 | `preco_medio_aquisicao` | — | Preço de custo por ativo (tabela `[preco_medio_aquisicao]`); ativa modo covered_call |
-| `limiar_premio_restante` | `0.20` | Gatilho de rolagem: fração do prêmio ainda em aberto abaixo da qual rolar |
-| `rolagem_min_dias` / `rolagem_max_dias` | `21` / `60` | Janela (dias) do vencimento-alvo do roll-out |
-| `permitir_strike_abaixo_custo` | `false` | Se `true`, sugestões de covered call podem vender strike abaixo do custo |
 
 ---
 
 ## Output
 
 Gera `top_opcoes_covered_call.xlsx` (configurável em `arquivo_excel`) com o
-ranking das melhores opções por ativo. Principais colunas:
-
-As colunas de custo (`retorno_sobre_custo`, `capital_por_contrato`,
-`alerta_abaixo_custo`) só aparecem quando `preco_medio_aquisicao` é informado.
+ranking das melhores opções por ativo. Colunas de custo (`retorno_sobre_custo`,
+`capital_por_contrato`, `alerta_abaixo_custo`) só aparecem quando
+`preco_medio_aquisicao` é informado.
 
 | Coluna | Descrição |
 |---|---|
@@ -229,6 +252,9 @@ As colunas de custo (`retorno_sobre_custo`, `capital_por_contrato`,
 | `alerta_abaixo_custo` | (com custo) `true` se strike < preço médio de aquisição |
 | `retorno_anualizado_pct` | Retorno anualizado bruto do prêmio |
 | `retorno_anualizado_liquido` | Retorno anualizado líquido de custos |
+| `retorno_se_exercido_anualizado` | Retorno anualizado se a call for exercida |
+| `downside_protection` | Quanto o ativo pode cair antes do break-even |
+| `lucro_se_exercido` | P&L total se o strike for atingido |
 | `retorno_sobre_custo` | (com custo) Prêmio líquido / preço médio de aquisição |
 | `capital_por_contrato` | (com custo) Capital da posição por contrato (USD) |
 | `bid` / `ask` | Preços de mercado |
@@ -241,68 +267,72 @@ payoff (`payoff_<ATIVO>.png`) é gerado para a melhor opção.
 
 ### Matriz completa
 
-Além do ranking acima, é gerado `matriz_opcoes.xlsx` (configurável em
-`arquivo_matriz`) com **todas** as opções candidatas — inclusive as reprovadas
-nos filtros de liquidez e probabilidade — e uma coluna `status` por opção:
+Além do ranking, é gerado `matriz_opcoes.xlsx` (configurável em `arquivo_matriz`)
+com **todas** as opções candidatas — inclusive as reprovadas — e uma coluna
+`status` por opção:
 
 | `status` | Significado |
 |---|---|
+| `ok` | Passou em todos os filtros |
 | `fora do filtro de liquidez` | Reprovada por volume/open interest/spread |
 | `fora do filtro de probabilidade de exercicio` | `prob_exercicio_final > prob_exerc_max` |
-| `fora dos filtros (retorno/strike/lucro)` | Passa liquidez e probabilidade, mas falha em retorno > 0, distância de strike ou lucro no exercício |
-| `ok` | Passou em todos os filtros (subconjunto que alimenta o ranking) |
-
-Os limiares de liquidez (`liquidez_volume_min`, `liquidez_open_interest_min`,
-`liquidez_spread_max`) são configuráveis.
+| `fora dos filtros (retorno/strike/lucro)` | Passa liquidez e probabilidade, mas falha em retorno, distância de strike ou lucro no exercício |
 
 ---
 
 ## Estrutura
 
 ```
-options/
-├── config.py            # Config declarativa (TOML) com validação
-├── runner.py            # Orquestração de alto nível (run e backtest)
-├── ranking.py           # Filtros + score + top-N
-├── portfolio.py         # Análise de carteira: covered call, rolagem e buy-write
-├── report.py            # Saída: tabela, Excel e gráfico
-├── backtest.py          # Backtest da covered call sobre o histórico
-├── cli.py               # Interface de linha de comando
-├── logging_setup.py     # Logging estruturado
-├── data/                # Provedores de dados intercambiáveis
-│   ├── base.py          #   interface ProvedorDados + DadosMercado
-│   ├── yfinance_provider.py  # online, com cache e retry
-│   ├── mock_provider.py # offline (CSV/JSON)
-│   ├── cache.py         # cache em disco (parquet) com TTL
-│   └── retry.py         # backoff exponencial
-└── models/              # Núcleo quantitativo
-    ├── black_scholes.py # prob d2 (risk-neutral) e preço da call
-    ├── empirical.py     # prob empírica histórica (janelas não-sobrepostas)
-    ├── greeks.py        # delta, gamma, vega, theta, rho
-    ├── volatility.py    # volatilidade realizada (fallback de IV)
-    ├── pipeline.py      # métricas por cadeia de opções
-    └── payoff.py        # gráfico de payoff
+allocation/
+├── opcoes/              — tudo que usa cadeia de opções + Black-Scholes
+│   ├── calls.py         — covered call ranking (filtros, score, top-N)
+│   ├── pipeline.py      — batch vetorizado de 30+ métricas por contrato
+│   ├── backtest.py      — simulação histórica da covered call
+│   ├── puts.py          — venda de puts cash-secured / naked [stub]
+│   ├── spreads.py       — multi-perna: bull spread, iron condor [stub]
+│   ├── volatilidade.py  — IV rank, term structure, skew [stub]
+│   └── hedge.py         — collar, put protetora, beta hedge [stub]
+├── acoes/
+│   └── screening.py     — screening fundamentalista + momentum [stub]
+├── risco/
+│   ├── portfolio.py     — análise multi-cliente: covered call, rolagem, buy-write
+│   ├── analytics.py     — Greeks agregados, VaR, drawdown, stress test [stub]
+│   ├── montecarlo.py    — simulação GBM de portfólio [stub]
+│   └── crises.py        — replay contra períodos de crise histórica [stub]
+├── data/                — compartilhado: ProvedorDados, yfinance, mock, cache, retry
+├── models/              — matemática pura: black_scholes, empirical, greeks, volatility, payoff
+├── config.py            — Config declarativa (TOML) com validação
+├── runner.py            — orquestrador de alto nível
+├── report.py            — saída: Excel e gráfico de payoff
+└── cli.py               — interface de linha de comando
 
-config.toml              # Configuração da execução
-tests/                   # Suíte pytest (modelos, greeks, backtest, e2e)
-t1.py                    # Entrypoint legado (carrega config.toml automaticamente)
+config.toml              — configuração da execução
+exemplo_carteira.json    — exemplo de carteira multi-cliente
+tests/                   — suíte pytest (modelos, greeks, backtest, e2e, carteira)
+t1.py                    — entrypoint legado (carrega config.toml automaticamente)
 ```
 
 ### Desenvolvimento
 
 ```bash
-pytest            # testes
-ruff check .      # lint
-mypy options      # type-check
+python3 -m pytest         # testes (usar python3 -m pytest, não bare pytest)
+ruff check .              # lint
+mypy allocation           # type-check
 ```
 
 CI no GitHub Actions roda lint + mypy + testes em cada PR (Python 3.11 e 3.12).
 
 ### Arquitetura
 
-A camada de dados é abstraída pela interface `ProvedorDados`, permitindo trocar
-yfinance, dados mock ou qualquer outra fonte sem alterar os modelos ou o ranking.
-O provedor online aplica cache em disco (TTL) e retry com backoff exponencial.
+A camada de dados é abstraída pela interface `ProvedorDados` (`data/base.py`),
+permitindo trocar yfinance por dados mock ou qualquer outra fonte sem alterar
+modelos ou ranking. O provedor online aplica cache em disco (TTL configurável)
+e retry com backoff exponencial.
+
+O `opcoes/pipeline.py:preparar_calls_para_modelo()` é o núcleo — uma única
+passagem vetorizada que calcula todas as 30+ métricas por contrato. Novos
+indicadores pertencem aqui. Os módulos `models/` contêm apenas matemática pura
+(Black-Scholes, Greeks, probabilidade empírica) sem efeitos colaterais.
 
 ---
 
@@ -328,22 +358,23 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-### Instalação fixando versão (Databricks)
+### Instalação fixando versão
 
-```python
+```bash
 # Versão específica — recomendado para produção
-%pip install git+https://github.com/antonyoggiannini/options.git@v0.1.0
+pip install git+https://github.com/antonyoggiannini/options.git@v0.6.0
 
 # Sempre a última versão da main
-%pip install git+https://github.com/antonyoggiannini/options.git
+pip install git+https://github.com/antonyoggiannini/options.git
 ```
 
 ### Histórico
 
 | Versão | Descrição |
 |---|---|
-| `0.5.0` | Custo de exercício realista (`max(0,25% × valor de venda, US$ 10)`): descontado do prêmio líquido, refletido no payoff e usado no novo filtro `lucro_se_exercido > 0` que descarta operações com prejuízo se exercidas |
-| `0.4.0` | `options carteira` aceita múltiplos clientes (array no JSON) e itera sobre todos, gerando um `analise_<cliente>.xlsx` por cliente; `--saida` passa a ser a pasta de saída |
-| `0.3.0` | Análise de carteira (`options carteira`): covered call sobre ações descobertas, rolagem por prêmio restante baixo e buy-write em ativos não detidos; custo desacoplado do screener |
-| `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável; remoção do Monte Carlo |
-| `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, Monte Carlo, empírico), CLI, cache, backtest |
+| `0.6.0` | Rename `options` → `allocation`; reorganização em módulos `opcoes/`, `acoes/`, `risco/`; stubs de puts, spreads, volatilidade, hedge, analytics, montecarlo, crises |
+| `0.5.0` | Custo de exercício realista (`max(0,25% × valor de venda, US$ 10)`): descontado do prêmio líquido, refletido no payoff e usado no filtro `lucro_se_exercido > 0` |
+| `0.4.0` | `carteira` aceita múltiplos clientes (array JSON); `--saida` passa a ser pasta de saída |
+| `0.3.0` | Análise de carteira: covered call sobre ações descobertas, rolagem por prêmio restante baixo e buy-write |
+| `0.2.0` | Score e filtro líquidos; covered_call vs buy_write; cost basis no ranking; empírica sem sobreposição; filtro OTM parametrizável |
+| `0.1.0` | Versão inicial — núcleo quantitativo (Black-Scholes, empírico), CLI, cache, backtest |
