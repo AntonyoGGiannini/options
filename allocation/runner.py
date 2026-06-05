@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pandas as pd
 
-from allocation.opcoes.backtest import backtest_covered_call
 from allocation.config import Config
 from allocation.data.base import ProvedorDados
 from allocation.data.cache import CacheDisco
 from allocation.data.mock_provider import ProvedorMock
 from allocation.data.yfinance_provider import ProvedorYFinance
 from allocation.logging_setup import obter_logger
+from allocation.opcoes.backtest import backtest_covered_call
 from allocation.opcoes.calls import processar_ativo
 from allocation.report import (
     gerar_grafico_melhor,

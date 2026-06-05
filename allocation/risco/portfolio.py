@@ -29,9 +29,9 @@ from allocation.config import Config
 from allocation.data.base import DadosMercado, ProvedorDados
 from allocation.logging_setup import obter_logger
 from allocation.models.black_scholes import preco_call_bs
-from allocation.opcoes.pipeline import preparar_calls_para_modelo
 from allocation.models.volatility import volatilidade_realizada
 from allocation.opcoes.calls import processar_ativo
+from allocation.opcoes.pipeline import preparar_calls_para_modelo
 from allocation.runner import construir_provedor, executar
 
 logger = obter_logger(__name__)

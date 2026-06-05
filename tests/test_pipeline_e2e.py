@@ -6,8 +6,8 @@ import pandas as pd
 
 from allocation.config import Config
 from allocation.data.mock_provider import ProvedorMock
-from allocation.opcoes.pipeline import preparar_calls_para_modelo
 from allocation.opcoes.calls import processar_ativo
+from allocation.opcoes.pipeline import preparar_calls_para_modelo
 from allocation.runner import executar
 
 

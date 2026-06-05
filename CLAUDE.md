@@ -85,7 +85,7 @@ allocation/
 
 **Probability model:** Final probability = `max(prob_d2, prob_empirica)` (conservative worst-case). d2 from Black-Scholes in `models/black_scholes.py`; empirical from non-overlapping historical windows in `models/empirical.py`.
 
-**Scoring:** `score_venda = retorno_anualizado_liquido × (1 - prob_exercicio_final)` — rewards income, penalizes assignment risk.
+**Scoring:** `score_venda = retorno_se_exercido_anualizado × (1 - prob_exercicio_final) × (1 + peso_theta × theta_eff) / (1 + peso_vega × vega_risk)` — rewards if-called return and theta yield, penalizes assignment risk and vega exposure. `peso_theta` and `peso_vega` default to 0 in config (pure return × probability mode).
 
 **Cost model:** Net premium = `premium - sell_cost - (exercise_cost × prob_final)`, where exercise cost = `max(0.25% × strike × 100, $10)`.
 

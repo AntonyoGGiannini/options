@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from allocation.opcoes.backtest import backtest_covered_call
 from allocation.config import Config
 from allocation.models.volatility import volatilidade_realizada
+from allocation.opcoes.backtest import backtest_covered_call
 
 
 def test_vol_realizada_de_serie_constante_e_zero():
