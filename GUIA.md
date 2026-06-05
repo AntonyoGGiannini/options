@@ -93,10 +93,10 @@ liquidez_spread_max        = 0.15  # spread bid-ask máximo como fração do mid
 
 ```toml
 tamanho_contrato    = 100      # ações por contrato
-custo_compra        = 0.0      # custo fixo por contrato ao comprar ($)
-custo_venda         = 0.0      # custo fixo por contrato ao vender ($)
+custo_compra        = 1.0      # custo fixo por contrato ao comprar ($)
+custo_venda         = 1.0      # custo fixo por contrato ao vender ($)
 custo_exercicio_pct = 0.0025   # 0.25% do valor nocional se exercido
-custo_exercicio_min = 10.0     # mínimo de custo de exercício por contrato ($)
+custo_exercicio_min = 0.0     # mínimo de custo de exercício por contrato ($)
 ```
 
 Custo de exercício efetivo por contrato:
