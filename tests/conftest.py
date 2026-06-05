@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from options.data.mock_provider import ProvedorMock
+from allocation.data.mock_provider import ProvedorMock
 
 RAIZ = Path(__file__).resolve().parent.parent
 

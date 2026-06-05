@@ -24,10 +24,10 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Lint (ruff)
-        run: ruff check options tests
+        run: ruff check allocation tests
 
       - name: Type check (mypy)
-        run: mypy options
+        run: mypy allocation
 
       - name: Tests (pytest)
         run: pytest

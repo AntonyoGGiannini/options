@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from options.config import Config
-from options.data.mock_provider import ProvedorMock
-from options.models.pipeline import preparar_calls_para_modelo
-from options.ranking import processar_ativo
-from options.runner import executar
+from allocation.config import Config
+from allocation.data.mock_provider import ProvedorMock
+from allocation.opcoes.calls import processar_ativo
+from allocation.opcoes.pipeline import preparar_calls_para_modelo
+from allocation.runner import executar
 
 
 def test_provedor_mock_carrega(dados_ibit):
