@@ -132,6 +132,29 @@ def test_custo_alto_exclui_por_prejuizo_no_exercicio(pasta_mock):
     assert (df2["lucro_se_exercido"] <= 0).all()
 
 
+def test_if_called_e_downside_presentes(pasta_mock):
+    """retorno_se_exercido_anualizado e downside_protection presentes e corretos."""
+    config = Config(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    provedor = ProvedorMock(pasta_mock)
+    df = processar_ativo("IBIT", provedor, config)
+    assert not df.empty
+    assert "retorno_se_exercido_anualizado" in df.columns
+    assert "downside_protection" in df.columns
+    # para calls OTM (strike > preco_atual), if-called >= static
+    otm = df[df["strike"] > df["preco_atual_ativo"]]
+    if not otm.empty:
+        assert (otm["retorno_se_exercido_anualizado"] >= otm["retorno_anualizado_liquido"] - 1e-9).all()
+    # downside protection é o prêmio como fração do preço: deve estar em (0, 1)
+    assert (df["downside_protection"] > 0).all()
+    assert (df["downside_protection"] < 1).all()
+    # score_venda deve estar em ordem decrescente (ranking preservado)
+    assert df["score_venda"].is_monotonic_decreasing
+
+
 _STATUS_VALIDOS = {
     "fora do filtro de liquidez",
     "fora do filtro de probabilidade de exercicio",
