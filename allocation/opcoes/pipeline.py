@@ -56,6 +56,13 @@ def preparar_calls_para_modelo(
       contratos com delta ≥ 0.70, onde o exercício antecipado é mais provável.
     - prob_d2 (risk-neutral) e prob_empirica (mundo real) são medidas distintas;
       combiná-las via max é conservador mas heterogêneo por construção.
+
+    Convenção de tempo:
+    - T e todas as anualizações usam dias-calendário sobre ``dias_ano``
+      (ACT/365 por padrão), a convenção usual de Black-Scholes e do decaimento
+      do prêmio. Para base de pregões, use ``dias_ano = 252`` na config.
+    - A prob_empirica usa dias úteis (``np.busday_count``), coerente com a
+      série histórica de pregões. Não é inconsistência: são domínios distintos.
     """
     if df_calls.empty:
         return df_calls.copy()

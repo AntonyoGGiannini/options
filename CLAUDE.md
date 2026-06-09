@@ -95,7 +95,9 @@ allocation/
 
 **Volatility fallback:** IV from yfinance is preferred; if unavailable, realized historical vol is used and `fonte_vol` is set to `"historica"` vs `"implicita"`.
 
-**Filter order in `opcoes/calls.py`:** Liquidity → probability cap → strike distance → positive net return → positive profit-if-exercised. Rejected options are kept in the full matrix with a `status` column explaining rejection reason.
+**Filter order in `opcoes/calls.py`:** Liquidity → probability cap → strike distance → net return above `min_retorno_anualizado_liquido` → profit-if-exercised above `min_lucro_se_exercido` (both default 0.0 = strictly positive). Rejected options are kept in the full matrix with a `status` column explaining rejection reason.
+
+**Time convention:** `T` and all annualizations use calendar days over `dias_ano` (ACT/365 by default; set `dias_ano = 252` for a trading-day base). The empirical probability uses business days (`np.busday_count`), consistent with the price history being trading sessions — these are intentionally distinct domains.
 
 **Mock data:** `base_mock/` contains pre-downloaded CSV/JSON for 23 tickers used in offline mode and tests. Tests use fixtures from `tests/conftest.py` pointing to this directory.
 
