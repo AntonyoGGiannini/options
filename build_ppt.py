@@ -138,7 +138,10 @@ slide_conteudo(
      ("Posição atual e caixa disponível diferentes para cada um", 1, False),
      ("Recomendar \"na mão\" não escala", 0, True),
      ("Lento, inconsistente e difícil de auditar", 1, False),
-     ("Conhecimento preso na cabeça de poucas pessoas", 1, False)],
+     ("Conhecimento preso na cabeça de poucas pessoas", 1, False),
+     ("A carteira deve estar em conformidade regulatória", 0, True),
+     ("FINRA (EUA) e CVM (Brasil) impõem regras de suitability e adequação de produtos", 1, False),
+     ("Qualquer recomendação precisa ser rastreável e justificável perante os reguladores", 1, False)],
     "2/14",
     sub="A pergunta que move este projeto")
 # pergunta-gancho destacada
@@ -159,7 +162,12 @@ slide_conteudo(
     [("Uma carteira aderente ao seu perfil (model portfolio)", 0, True),
      ("Respeito às suas restrições e à política da casa", 0, True),
      ("Os produtos de melhor qualidade primeiro", 0, True),
-     ("Uma ordem de compra pronta para o caixa que ele tem hoje", 0, True)],
+     ("Uma ordem de compra pronta para o caixa que ele tem hoje", 0, True),
+     ("Facilidade de execução", 0, True),
+     ("Receber exatamente o que comprar, quanto e em qual produto — sem ambiguidade", 1, False),
+     ("Acompanhamento contínuo", 0, True),
+     ("Saber se a carteira ainda está aderente ao alvo após movimentos de mercado", 1, False),
+     ("Ser avisado quando houver oportunidade de melhora ou desvio relevante", 1, False)],
     "3/14")
 
 # ================================================================ SLIDE 4 — Funil
@@ -250,40 +258,69 @@ slide_conteudo(
 # ================================================================ SLIDE 9 — Etapa 5 (herói)
 s = slide_base(AZUL_ESCURO)
 chip(s, Inches(0.55), Inches(0.5), "OTIMIZADOR", CIANO)
-_, tf = caixa(s, Inches(0.55), Inches(0.95), Inches(12.2), Inches(1.1))
-par(tf, "Etapa 5 — A decisão", 34, BRANCO, bold=True, primeiro=True, space_after=2)
-par(tf, "O coração do modelo: onde colocar o caixa", 16, CIANO, italic=True, space_after=0)
-_, tf = caixa(s, Inches(0.7), Inches(2.4), Inches(7.4), Inches(4.4))
+_, tf = caixa(s, Inches(0.55), Inches(0.95), Inches(12.2), Inches(0.8))
+par(tf, "Etapa 5 — A decisão: water-filling", 30, BRANCO, bold=True, primeiro=True, space_after=2)
+par(tf, "O caixa vai primeiro para quem está mais longe do alvo", 14, CIANO, italic=True, space_after=0)
+
+# ---- explicação (lado esquerdo) ----
+_, tf = caixa(s, Inches(0.55), Inches(2.0), Inches(4.2), Inches(4.8))
 itens = [
-    ("Water-filling", "Distribui o caixa fechando primeiro os maiores gaps em relação ao alvo — sem nunca vender"),
-    ("Respeita os limites", "Aplicação mínima e teto de concentração, considerando o que o cliente já tem"),
-    ("Regra de sobra", "Resíduos caem numa categoria-coringa (AV1010) com tratamento dedicado"),
+    ("Water-filling", "Fecha os maiores gaps primeiro — sem nunca vender"),
+    ("Respeita limites", "Aplicação mínima + teto de concentração sobre posição já existente"),
+    ("Regra de sobra", "Resíduo vai para AV1010 (caixa/RF curto), com força se necessário"),
 ]
 primeiro = True
 for t, d in itens:
-    par(tf, t, 20, BRANCO, bold=True, primeiro=primeiro, space_after=2)
-    par(tf, d, 15, RGBColor(0xC9, 0xD6, 0xE6), space_after=14)
+    par(tf, t, 16, BRANCO, bold=True, primeiro=primeiro, space_after=1)
+    par(tf, d, 12, RGBColor(0xC9, 0xD6, 0xE6), space_after=12)
     primeiro = False
-# ilustração water-filling: copos preenchendo
-base_x = Inches(8.5)
-alturas = [1.8, 1.3, 2.4, 1.0]
-labels = ["Renda Fixa", "Ações", "Fundos", "Alt."]
-cup_w = Inches(0.85); cup_gap = Inches(0.25); cup_base_y = Inches(6.3)
-for i, h in enumerate(alturas):
-    cx = base_x + i * (cup_w + cup_gap)
-    # contorno do alvo
-    full = s.shapes.add_shape(1, cx, Inches(3.0), cup_w, Inches(3.3))
-    full.fill.background(); full.line.color.rgb = CINZA_CLARO; full.line.width = Pt(1)
-    full.shadow.inherit = False
-    # preenchido
-    fill_h = Inches(h)
-    filled = s.shapes.add_shape(1, cx, cup_base_y - fill_h, cup_w, fill_h)
-    filled.fill.solid(); filled.fill.fore_color.rgb = CIANO; filled.line.fill.background()
-    filled.shadow.inherit = False
-    lb = s.shapes.add_textbox(cx - Inches(0.1), Inches(6.4), cup_w + Inches(0.2), Inches(0.4))
-    p = lb.text_frame.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-    r = p.add_run(); r.text = labels[i]
-    r.font.size = Pt(10); r.font.color.rgb = RGBColor(0xC9, 0xD6, 0xE6); r.font.name = "Calibri"
+
+# ---- tabela antes / depois ----
+# dados: Categoria | Atual% | Alvo% | Gap | Compra | Depois%
+linhas = [
+    ("Categoria",       "Atual", "Alvo",  "Gap",    "Compra",    "Depois"),
+    ("AV1010  RF Curto","22%",   "15%",   "–",      "US$ 0",     "20%"),
+    ("AV2020  RF Longo","8%",    "20%",   "12%",    "US$ 36k",   "20%"),
+    ("AV3030  Ações",   "10%",   "15%",   "5%",     "US$ 15k",   "15%"),
+    ("AV4040  Fundos",  "18%",   "25%",   "7%",     "US$ 21k",   "25%"),
+    ("AV5050  Alternat.","4%",   "10%",   "6%",     "US$ 18k",   "10%"),
+    ("Caixa",           "US$300k","–",   "–",       "–US$90k",   "US$210k"),
+]
+col_w = [Inches(2.2), Inches(0.7), Inches(0.7), Inches(0.65), Inches(0.95), Inches(0.85)]
+row_h = Inches(0.46)
+tx = Inches(4.85)
+ty = Inches(2.0)
+header_cor = AZUL
+row_cores  = [RGBColor(0x14, 0x2A, 0x50), RGBColor(0x0F, 0x24, 0x45)]
+for ri, row in enumerate(linhas):
+    cx = tx
+    for ci, cell in enumerate(row):
+        is_header = ri == 0
+        bg = header_cor if is_header else row_cores[ri % 2]
+        rect = s.shapes.add_shape(1, cx, ty, col_w[ci], row_h)
+        rect.fill.solid(); rect.fill.fore_color.rgb = bg
+        rect.line.color.rgb = RGBColor(0x1E, 0x3A, 0x6E); rect.line.width = Pt(0.5)
+        rect.shadow.inherit = False
+        tf = rect.text_frame; tf.word_wrap = False; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
+        r = p.add_run(); r.text = cell
+        r.font.size = Pt(11 if is_header else 12)
+        r.font.bold = is_header
+        # destaca coluna "Depois" em verde
+        if ci == 5 and not is_header:
+            r.font.color.rgb = RGBColor(0x4C, 0xE8, 0xA8)
+        elif ci == 4 and not is_header and cell != "US$ 0" and cell != "–":
+            r.font.color.rgb = CIANO
+        else:
+            r.font.color.rgb = BRANCO
+        r.font.name = "Calibri"
+        cx += col_w[ci]
+    ty += row_h
+
+# legenda
+_, tf = caixa(s, Inches(4.85), Inches(5.3), Inches(8.4), Inches(0.4))
+par(tf, "Exemplo ilustrativo — cliente perfil moderado, aporte de US$ 100k + caixa existente de US$ 200k",
+    10, CINZA_CLARO, italic=True, primeiro=True)
 rodape(s, "9/14")
 
 # ================================================================ SLIDE 10 — Exemplo
