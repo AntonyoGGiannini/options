@@ -86,7 +86,11 @@ def test_processar_ativo_puts_offline_ranqueia(pasta_mock):
     assert (df["ranking_ativo"] == range(1, len(df) + 1)).all()
     assert df["score_venda"].is_monotonic_decreasing
     assert (df["ativo"] == "IBIT").all()
-    # economia da put: preço efetivo de compra abaixo do strike
+    # economia da put: preço efetivo condicional ao exercício usa o custo de
+    # atribuição integral (não ponderado pela probabilidade)
+    custo_exerc_por_acao = np.maximum(0.0025 * df["strike"] * 100, 10.0) / 100
+    esperado = df["strike"] - (df["premio"] - custo_exerc_por_acao)
+    assert np.allclose(df["preco_efetivo_se_exercido"], esperado)
     assert (df["preco_efetivo_se_exercido"] < df["strike"]).all()
     assert (df["colateral_por_contrato"] == df["strike"] * 100).all()
 

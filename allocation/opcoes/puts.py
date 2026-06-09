@@ -57,8 +57,11 @@ def rankear_puts(
     df["rendimento_liquido"] = df["premio_liquido"] / df["strike"]
     df["retorno_anualizado_liquido"] = df["rendimento_liquido"] / df["T"]
 
-    # preço efetivo de compra se exercido (strike menos o prêmio embolsado)
-    df["preco_efetivo_se_exercido"] = df["strike"] - df["premio_liquido"]
+    # preço efetivo de compra se exercido: condicional ao exercício, o custo de
+    # atribuição incide integral (não ponderado pela probabilidade) — mesma
+    # convenção do lucro_se_exercido das calls.
+    premio_se_exercido = df["premio"] - custo_venda_por_acao - custo_exerc_por_acao
+    df["preco_efetivo_se_exercido"] = df["strike"] - premio_se_exercido
     df["desconto_vs_spot"] = 1 - df["preco_efetivo_se_exercido"] / preco_atual
 
     passou_liquidez = (
