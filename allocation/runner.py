@@ -12,10 +12,12 @@ from allocation.data.yfinance_provider import ProvedorYFinance
 from allocation.logging_setup import obter_logger
 from allocation.opcoes.backtest import backtest_covered_call
 from allocation.opcoes.calls import processar_ativo
+from allocation.opcoes.puts import processar_ativo_puts
 from allocation.report import (
     gerar_grafico_melhor,
     montar_matriz_output,
     montar_output,
+    montar_output_puts,
     salvar_excel,
     salvar_matriz_completa,
 )
@@ -88,6 +90,61 @@ def executar_e_reportar(config: Config, provedor: ProvedorDados | None = None) -
 
     salvar_excel(df_output, config.arquivo_excel)
     gerar_grafico_melhor(df_final, config)
+    return df_final
+
+
+def executar_puts(
+    config: Config,
+    provedor: ProvedorDados | None = None,
+    matriz_out: list[pd.DataFrame] | None = None,
+) -> pd.DataFrame:
+    """Processa puts cash-secured de todos os ativos e consolida o ranking.
+
+    matriz_out: se fornecido, recebe (extend) a matriz completa de candidatas de
+    todos os ativos, com a coluna ``status`` por opção.
+    """
+    if provedor is None:
+        provedor = construir_provedor(config)
+
+    resultados = []
+    for ativo in config.lista_ativos:
+        logger.info(">>> Processando puts de %s...", ativo)
+        df_top = processar_ativo_puts(
+            ativo, provedor, config,
+            salvar_mock=config.salvar_mock and not config.modo_offline,
+            matriz_out=matriz_out,
+        )
+        if not df_top.empty:
+            resultados.append(df_top)
+
+    if not resultados:
+        logger.warning("Nenhuma put encontrada para os ativos analisados.")
+        return pd.DataFrame()
+
+    return pd.concat(resultados, ignore_index=True)
+
+
+def executar_e_reportar_puts(
+    config: Config, provedor: ProvedorDados | None = None
+) -> pd.DataFrame:
+    """Executa a análise de puts, imprime o resumo e salva os Excel."""
+    matriz: list[pd.DataFrame] = []
+    df_final = executar_puts(config, provedor, matriz_out=matriz)
+
+    if matriz:
+        df_matriz = montar_matriz_output(pd.concat(matriz, ignore_index=True))
+        salvar_matriz_completa(df_matriz, config.arquivo_matriz_puts)
+
+    if df_final.empty:
+        return df_final
+
+    df_output = montar_output_puts(df_final)
+    print("\n" + "=" * 80)
+    print(f"TOP {config.top_n} PUTS CASH-SECURED POR ATIVO")
+    print("=" * 80)
+    print(df_output.to_string(index=False))
+
+    salvar_excel(df_output, config.arquivo_excel_puts)
     return df_final
 
 

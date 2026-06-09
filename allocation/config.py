@@ -90,6 +90,9 @@ class Config:
     arquivo_excel: str = "top_opcoes_covered_call.xlsx"
     # matriz completa de candidatas (todas as opções, com coluna de status)
     arquivo_matriz: str = "matriz_opcoes.xlsx"
+    # saídas da análise de puts cash-secured (subcomando puts)
+    arquivo_excel_puts: str = "top_opcoes_puts.xlsx"
+    arquivo_matriz_puts: str = "matriz_opcoes_puts.xlsx"
 
     def __post_init__(self) -> None:
         self.validar()

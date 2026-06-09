@@ -1,13 +1,16 @@
-"""Pipeline de cálculo de métricas por cadeia de opções."""
+"""Pipeline de cálculo de métricas por cadeia de opções (calls e puts)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from allocation.models.black_scholes import calcular_prob_exercicio_risk_neutral_vetor
+from allocation.models.black_scholes import (
+    calcular_prob_exercicio_put_vetor,
+    calcular_prob_exercicio_risk_neutral_vetor,
+)
 from allocation.models.empirical import calcular_probabilidade_empirica_batch
-from allocation.models.greeks import calcular_greeks_call
+from allocation.models.greeks import calcular_greeks_call, calcular_greeks_put
 from allocation.models.volatility import volatilidade_realizada
 
 
@@ -28,8 +31,8 @@ def calcular_premio_vetor(df, usar_premio):
     raise ValueError("usar_premio deve ser: bid, ask, lastPrice ou mid")
 
 
-def preparar_calls_para_modelo(
-    df_calls,
+def preparar_opcoes_para_modelo(
+    df_opcoes,
     preco_atual,
     taxa_livre_risco,
     dividend_yield,
@@ -44,16 +47,23 @@ def preparar_calls_para_modelo(
     liquidez_volume_min=100,
     liquidez_open_interest_min=500,
     liquidez_spread_max=0.15,
+    tipo="call",
 ):
     """
-    Calcula métricas de contrato por cadeia de opções.
+    Calcula métricas de contrato por cadeia de opções (calls ou puts).
     Flags usar_prob_d2 / usar_prob_empirica permitem ligar/desligar cada modelo.
     prob_exercicio_final = max(prob_exercicio_d2, prob_empirica) — conservador.
 
+    tipo: "call" (default) ou "put". Para puts: prob de exercício = N(−d2),
+    greeks de put, prob empírica conta quedas até o strike e
+    distancia_strike_pct = 1 − strike/spot (positivo = OTM abaixo do spot, mesma
+    semântica de "distância OTM mínima" do filtro).
+
     Premissas:
-    - Greeks e prob d2 assumem exercício europeu (Black-Scholes). Para calls
-      americanas com dividendo, o flag risco_atribuicao_antecipada sinaliza
-      contratos com delta ≥ 0.70, onde o exercício antecipado é mais provável.
+    - Greeks e prob d2 assumem exercício europeu (Black-Scholes). O flag
+      risco_atribuicao_antecipada sinaliza contratos com |delta| ≥ 0.70 onde o
+      exercício antecipado é mais provável (calls: condicionado a dividendo;
+      puts ITM profundas: risco por juros, independente de dividendo).
     - prob_d2 (risk-neutral) e prob_empirica (mundo real) são medidas distintas;
       combiná-las via max é conservador mas heterogêneo por construção.
 
@@ -64,10 +74,13 @@ def preparar_calls_para_modelo(
     - A prob_empirica usa dias úteis (``np.busday_count``), coerente com a
       série histórica de pregões. Não é inconsistência: são domínios distintos.
     """
-    if df_calls.empty:
-        return df_calls.copy()
+    if tipo not in {"call", "put"}:
+        raise ValueError("tipo deve ser 'call' ou 'put'")
 
-    df = df_calls.copy()
+    if df_opcoes.empty:
+        return df_opcoes.copy()
+
+    df = df_opcoes.copy()
 
     # garante colunas de liquidez (robustez para mocks/dados sem mid/spread_pct)
     if "mid" not in df.columns:
@@ -89,7 +102,10 @@ def preparar_calls_para_modelo(
     df["T"] = df["dias_vencimento"] / dias_ano
     df["premio"] = calcular_premio_vetor(df, usar_premio)
 
-    df["distancia_strike_pct"] = (df["strike"] / df["preco_atual"]) - 1
+    if tipo == "call":
+        df["distancia_strike_pct"] = (df["strike"] / df["preco_atual"]) - 1
+    else:
+        df["distancia_strike_pct"] = 1 - (df["strike"] / df["preco_atual"])
     df["retorno_necessario"] = df["distancia_strike_pct"]
     df["retorno_premio_pct"] = df["premio"] / df["preco_atual"]
 
@@ -122,7 +138,12 @@ def preparar_calls_para_modelo(
 
     # --- prob_exercicio (d2 / risk-neutral) ---
     if usar_prob_d2:
-        df["prob_exercicio"] = calcular_prob_exercicio_risk_neutral_vetor(
+        calcular_prob = (
+            calcular_prob_exercicio_risk_neutral_vetor
+            if tipo == "call"
+            else calcular_prob_exercicio_put_vetor
+        )
+        df["prob_exercicio"] = calcular_prob(
             df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
             df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada
         )
@@ -130,7 +151,8 @@ def preparar_calls_para_modelo(
         df["prob_exercicio"] = np.nan
 
     # --- Greeks (Black-Scholes) ---
-    greeks = calcular_greeks_call(
+    calcular_greeks = calcular_greeks_call if tipo == "call" else calcular_greeks_put
+    greeks = calcular_greeks(
         df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
         df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada,
     )
@@ -142,8 +164,12 @@ def preparar_calls_para_modelo(
 
     # --- risco de atribuição antecipada (heurística) ---
     # Calls americanas com dividendo (q>0) e delta alto têm risco de exercício
-    # antecipado próximo à data ex-dividendo.
-    df["risco_atribuicao_antecipada"] = (dividend_yield > 0) & (df["delta"] >= 0.70)
+    # antecipado próximo à data ex-dividendo. Puts ITM profundas têm risco por
+    # juros (independe de dividendo).
+    if tipo == "call":
+        df["risco_atribuicao_antecipada"] = (dividend_yield > 0) & (df["delta"] >= 0.70)
+    else:
+        df["risco_atribuicao_antecipada"] = df["delta"] <= -0.70
 
     # --- prob_empirica (histórico, janelas não-sobrepostas) ---
     if usar_prob_empirica and historico_precos is not None and len(historico_precos) > 0:
@@ -153,6 +179,7 @@ def preparar_calls_para_modelo(
             df["strike"].to_numpy(),
             df["dias_uteis_ate_vencimento"].to_numpy(),
             min_amostras=min_amostras_empirica,
+            direcao="acima" if tipo == "call" else "abaixo",
         )
         df["prob_empirica"] = probs_emp
         df["usa_prob_empirica"] = usa_emp
@@ -169,3 +196,15 @@ def preparar_calls_para_modelo(
     )
 
     return df
+
+
+def preparar_calls_para_modelo(df_calls, *args, **kwargs):
+    """Métricas da cadeia de calls — ver ``preparar_opcoes_para_modelo``."""
+    kwargs["tipo"] = "call"
+    return preparar_opcoes_para_modelo(df_calls, *args, **kwargs)
+
+
+def preparar_puts_para_modelo(df_puts, *args, **kwargs):
+    """Métricas da cadeia de puts — ver ``preparar_opcoes_para_modelo``."""
+    kwargs["tipo"] = "put"
+    return preparar_opcoes_para_modelo(df_puts, *args, **kwargs)
