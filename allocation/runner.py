@@ -12,6 +12,7 @@ from allocation.data.yfinance_provider import ProvedorYFinance
 from allocation.logging_setup import obter_logger
 from allocation.opcoes.backtest import backtest_covered_call
 from allocation.opcoes.calls import processar_ativo
+from allocation.opcoes.hedge import avaliar_collar, avaliar_protective_put
 from allocation.opcoes.puts import processar_ativo_puts
 from allocation.opcoes.volatilidade import analisar_volatilidade
 from allocation.report import (
@@ -204,6 +205,47 @@ def executar_volatilidade(
         logger.info("Análise de volatilidade salva em: %s", arquivo_saida)
 
     return df_resumo
+
+
+def executar_hedge(
+    config: Config,
+    ativo: str,
+    preco_custo: float | None = None,
+    top_n: int | None = None,
+    provedor: ProvedorDados | None = None,
+    arquivo_saida: str | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Avalia protective puts e collars para uma posição em um ativo.
+
+    Imprime os melhores candidatos de cada estratégia; se ``arquivo_saida`` for
+    informado, salva um Excel com abas protective_put / collar.
+    """
+    if provedor is None:
+        provedor = construir_provedor(config)
+    n = top_n if top_n is not None else config.top_n
+
+    dados = provedor.obter(ativo, config.periodo_historico)
+    df_pp = avaliar_protective_put(dados, config, preco_custo=preco_custo)
+    df_collar = avaliar_collar(dados, config, preco_custo=preco_custo)
+
+    if not df_pp.empty:
+        print(f"\n=== {ativo} — protective puts (menor perda máxima) ===")
+        print(df_pp.head(n).to_string(index=False))
+    if not df_collar.empty:
+        print(f"\n=== {ativo} — collars (proteção por unidade de custo) ===")
+        print(df_collar.head(n).to_string(index=False))
+    if df_pp.empty and df_collar.empty:
+        logger.warning("[%s] Nenhuma estrutura de hedge viável.", ativo)
+
+    if arquivo_saida and (not df_pp.empty or not df_collar.empty):
+        with pd.ExcelWriter(arquivo_saida) as writer:
+            if not df_pp.empty:
+                df_pp.to_excel(writer, sheet_name="protective_put", index=False)
+            if not df_collar.empty:
+                df_collar.to_excel(writer, sheet_name="collar", index=False)
+        logger.info("Análise de hedge salva em: %s", arquivo_saida)
+
+    return {"protective_put": df_pp, "collar": df_collar}
 
 
 def executar_backtest(

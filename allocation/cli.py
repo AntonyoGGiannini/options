@@ -18,6 +18,7 @@ from allocation.runner import (
     executar_backtest,
     executar_e_reportar,
     executar_e_reportar_puts,
+    executar_hedge,
     executar_volatilidade,
 )
 
@@ -67,6 +68,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     vol = sub.add_parser("vol", help="Análise de volatilidade (term structure, cone, skew).")
     vol.add_argument("--saida", default=None,
                      help="Arquivo Excel de saída (abas: resumo, term_structure, cone, skew).")
+
+    hg = sub.add_parser("hedge", help="Protective put e collar para uma posição em um ativo.")
+    hg.add_argument("--ativo", required=True, help="Ticker da posição a proteger.")
+    hg.add_argument("--custo-medio", type=float, default=None,
+                    help="Preço médio de aquisição da posição (default: preço de mercado).")
+    hg.add_argument("--saida", default=None,
+                    help="Arquivo Excel de saída (abas: protective_put, collar).")
 
     bt = sub.add_parser("backtest", help="Backtest da estratégia sobre o histórico.")
     bt.add_argument("--distancia", type=float, default=0.05,
@@ -124,6 +132,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.comando == "vol":
         df_resumo = executar_volatilidade(config, arquivo_saida=args.saida)
         return 0 if not df_resumo.empty else 1
+
+    if args.comando == "hedge":
+        resultado = executar_hedge(
+            config, args.ativo, preco_custo=args.custo_medio,
+            arquivo_saida=args.saida,
+        )
+        tem_resultado = any(not df.empty for df in resultado.values())
+        return 0 if tem_resultado else 1
 
     if args.comando == "backtest":
         df = executar_backtest(
