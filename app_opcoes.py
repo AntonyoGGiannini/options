@@ -117,8 +117,8 @@ st.sidebar.title("⚙️ Parâmetros")
 
 modo = st.sidebar.radio(
     "Fonte de dados",
-    ["Offline (mock)", "Online (yfinance)"],
-    help="Offline usa os CSVs de base_mock/. Online baixa da internet via yfinance.",
+    ["Online (yfinance)", "Offline (mock)"],
+    help="Online baixa da internet via yfinance. Offline usa os CSVs de base_mock/.",
 )
 offline = modo.startswith("Offline")
 
