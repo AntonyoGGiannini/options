@@ -24,6 +24,10 @@ allocation --config config.toml --salvar-mock --pasta-mock ./base_mock  # save m
 # Subcommands
 allocation --config config.toml backtest --distancia 0.05 --dias 14
 allocation --offline carteira --arquivo exemplo_carteira.json --saida ./relatorios
+allocation --offline puts                              # cash-secured put screener
+allocation --offline vol --saida vol.xlsx              # IV term structure, cone, skew
+allocation --offline hedge --ativo IBIT --custo-medio 55.0   # protective put + collar
+allocation --offline spreads --estrategia bull_call    # or iron_condor
 
 # Tests
 python3 -m pytest                      # all tests (use python3 -m pytest, not bare pytest)
@@ -60,10 +64,10 @@ allocation/
 │   ├── calls.py      — covered call ranking (core, formerly ranking.py)
 │   ├── pipeline.py   — vectorized 30+ metric batch (formerly models/pipeline.py)
 │   ├── backtest.py   — historical covered call simulation
-│   ├── puts.py       — cash-secured/naked put selling [stub]
-│   ├── spreads.py    — multi-leg: bull spread, iron condor [stub]
-│   ├── volatilidade.py — IV rank, term structure, skew [stub]
-│   └── hedge.py      — collar, protective put, beta hedge [stub]
+│   ├── puts.py       — cash-secured put selling (mirror of calls; return on collateral)
+│   ├── spreads.py    — multi-leg: bull call spread, iron condor
+│   ├── volatilidade.py — IV term structure, realized-vol cone/rank, skew by moneyness
+│   └── hedge.py      — protective put and collar analysis
 ├── acoes/
 │   └── screening.py  — fundamentals + momentum stock screening [stub]
 ├── risco/
@@ -79,9 +83,11 @@ allocation/
 └── cli.py            — argument parsing, subcommand routing
 ```
 
-**Data abstraction:** `data/base.py` defines `ProvedorDados` (protocol) and `DadosMercado` (container). `ProvedorYFinance` (online, disk-cached) and `ProvedorMock` (CSV/JSON files) are interchangeable — no model or ranking code touches the provider directly.
+**Data abstraction:** `data/base.py` defines `ProvedorDados` (protocol) and `DadosMercado` (container, with `df_calls` and `df_puts`). `ProvedorYFinance` (online, disk-cached) and `ProvedorMock` (CSV/JSON files) are interchangeable — no model or ranking code touches the provider directly. Mock folders without a `mock_{ativo}_puts.csv` degrade gracefully (empty `df_puts` + warning).
 
-**Pipeline:** `opcoes/pipeline.py:preparar_calls_para_modelo()` is the core — a single-pass vectorized function that computes all 30+ per-option metrics. Adding a new metric belongs here.
+**Pipeline:** `opcoes/pipeline.py:preparar_opcoes_para_modelo()` is the core — a single-pass vectorized function that computes all 30+ per-option metrics for calls or puts (`tipo="call"|"put"`); `preparar_calls_para_modelo`/`preparar_puts_para_modelo` are thin wrappers. Adding a new metric belongs here.
+
+**Per-leg premium convention (hedge/spreads):** bought legs are priced at `ask`, sold legs at `bid` (conservative), regardless of the screener's `config.usar_premio`.
 
 **Probability model:** Final probability = `max(prob_d2, prob_empirica)` (conservative worst-case). d2 from Black-Scholes in `models/black_scholes.py`; empirical from non-overlapping historical windows in `models/empirical.py`.
 
@@ -99,7 +105,7 @@ allocation/
 
 **Time convention:** `T` and all annualizations use calendar days over `dias_ano` (ACT/365 by default; set `dias_ano = 252` for a trading-day base). The empirical probability uses business days (`np.busday_count`), consistent with the price history being trading sessions — these are intentionally distinct domains.
 
-**Mock data:** `base_mock/` contains pre-downloaded CSV/JSON for 23 tickers used in offline mode and tests. Tests use fixtures from `tests/conftest.py` pointing to this directory.
+**Mock data:** `base_mock/` contains pre-downloaded CSV/JSON for 23 tickers used in offline mode and tests. Tests use fixtures from `tests/conftest.py` pointing to this directory. `mock_IBIT_puts.csv` is *synthetic* (derived from the calls CSV via put-call parity, ignores American early exercise) — regenerate with real data via `--salvar-mock` when online.
 
 **Config:** `config.toml` is the user-facing config. Per-asset overrides for dividend yield and cost basis use TOML tables:
 ```toml
@@ -110,7 +116,7 @@ AAPL = 0.005
 IBIT = 55.00
 ```
 
-**Outputs:** The screener writes `top_opcoes_covered_call.xlsx` (ranked results) and `matriz_opcoes.xlsx` (full matrix with rejection reasons). Portfolio analysis writes one Excel per client with three sheets: `covered_call`, `rolagem`, `buy_write`.
+**Outputs:** The screener writes `top_opcoes_covered_call.xlsx` (ranked results) and `matriz_opcoes.xlsx` (full matrix with rejection reasons); the puts screener writes `top_opcoes_puts.xlsx`/`matriz_opcoes_puts.xlsx`. Portfolio analysis writes one Excel per client with three sheets: `covered_call`, `rolagem`, `buy_write`. `vol`/`hedge`/`spreads` save Excel only when `--saida` is given.
 
 **Running tests:** Always use `python3 -m pytest` (not bare `pytest`) to ensure the correct Python environment picks up the installed package.
 
