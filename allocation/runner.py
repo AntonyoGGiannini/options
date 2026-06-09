@@ -13,6 +13,7 @@ from allocation.logging_setup import obter_logger
 from allocation.opcoes.backtest import backtest_covered_call
 from allocation.opcoes.calls import processar_ativo
 from allocation.opcoes.puts import processar_ativo_puts
+from allocation.opcoes.volatilidade import analisar_volatilidade
 from allocation.report import (
     gerar_grafico_melhor,
     montar_matriz_output,
@@ -146,6 +147,63 @@ def executar_e_reportar_puts(
 
     salvar_excel(df_output, config.arquivo_excel_puts)
     return df_final
+
+
+def executar_volatilidade(
+    config: Config,
+    provedor: ProvedorDados | None = None,
+    arquivo_saida: str | None = None,
+) -> pd.DataFrame:
+    """Analisa a volatilidade de cada ativo e consolida o resumo (1 linha/ativo).
+
+    Imprime o resumo e a term structure por ativo; se ``arquivo_saida`` for
+    informado, salva um Excel com abas resumo / term_structure / cone / skew.
+    """
+    if provedor is None:
+        provedor = construir_provedor(config)
+
+    resumos = []
+    detalhes: dict[str, list[pd.DataFrame]] = {
+        "term_structure": [], "cone": [], "skew": [],
+    }
+    for ativo in config.lista_ativos:
+        logger.info(">>> Analisando volatilidade de %s...", ativo)
+        try:
+            dados = provedor.obter(ativo, config.periodo_historico)
+        except Exception as exc:  # noqa: BLE001 — isola falha por ativo
+            logger.error("[%s] Erro ao obter dados: %s", ativo, exc)
+            continue
+        analise = analisar_volatilidade(dados, config)
+        resumos.append(analise["resumo"])
+        for chave in detalhes:
+            df_detalhe = analise[chave].copy()
+            df_detalhe.insert(0, "ativo", ativo)
+            detalhes[chave].append(df_detalhe)
+
+        print(f"\n=== {ativo} — term structure de IV ===")
+        print(analise["term_structure"].to_string(index=False))
+
+    if not resumos:
+        logger.warning("Nenhum ativo analisado.")
+        return pd.DataFrame()
+
+    df_resumo = pd.concat(resumos, ignore_index=True)
+    print("\n" + "=" * 80)
+    print("RESUMO DE VOLATILIDADE POR ATIVO")
+    print("=" * 80)
+    print(df_resumo.to_string(index=False))
+
+    if arquivo_saida:
+        with pd.ExcelWriter(arquivo_saida) as writer:
+            df_resumo.to_excel(writer, sheet_name="resumo", index=False)
+            for chave, dfs in detalhes.items():
+                if dfs:
+                    pd.concat(dfs, ignore_index=True).to_excel(
+                        writer, sheet_name=chave, index=False
+                    )
+        logger.info("Análise de volatilidade salva em: %s", arquivo_saida)
+
+    return df_resumo
 
 
 def executar_backtest(

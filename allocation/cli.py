@@ -18,6 +18,7 @@ from allocation.runner import (
     executar_backtest,
     executar_e_reportar,
     executar_e_reportar_puts,
+    executar_volatilidade,
 )
 
 logger = obter_logger(__name__)
@@ -62,6 +63,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.set_defaults(comando="run")
 
     sub.add_parser("puts", help="Screener de venda de puts cash-secured.")
+
+    vol = sub.add_parser("vol", help="Análise de volatilidade (term structure, cone, skew).")
+    vol.add_argument("--saida", default=None,
+                     help="Arquivo Excel de saída (abas: resumo, term_structure, cone, skew).")
 
     bt = sub.add_parser("backtest", help="Backtest da estratégia sobre o histórico.")
     bt.add_argument("--distancia", type=float, default=0.05,
@@ -115,6 +120,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.comando == "puts":
         df_final = executar_e_reportar_puts(config)
         return 0 if not df_final.empty else 1
+
+    if args.comando == "vol":
+        df_resumo = executar_volatilidade(config, arquivo_saida=args.saida)
+        return 0 if not df_resumo.empty else 1
 
     if args.comando == "backtest":
         df = executar_backtest(
