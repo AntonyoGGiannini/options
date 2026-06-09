@@ -191,6 +191,27 @@ def test_matriz_inclui_todas_e_marca_status(pasta_mock):
     assert chaves_final.issubset(chaves_ok)
 
 
+def test_filtro_min_retorno_configuravel(pasta_mock):
+    """Com min_retorno_anualizado_liquido proibitivo, nada passa e a matriz
+    marca a reprovação; com o default 0.0, o resultado é o comportamento atual."""
+    base = dict(
+        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
+        min_dias=0, max_dias=365,
+        modo_offline=True, pasta_mock=pasta_mock,
+    )
+    provedor = ProvedorMock(pasta_mock)
+
+    df_default = processar_ativo("IBIT", provedor, Config(**base))
+    assert not df_default.empty
+
+    matriz: list[pd.DataFrame] = []
+    config_alto = Config(**base, min_retorno_anualizado_liquido=10.0)
+    df_alto = processar_ativo("IBIT", provedor, config_alto, matriz_out=matriz)
+    assert df_alto.empty
+    df_matriz = pd.concat(matriz, ignore_index=True)
+    assert "fora dos filtros (retorno/strike/lucro)" in set(df_matriz["status"])
+
+
 def test_matriz_status_probabilidade(pasta_mock):
     """Com prob_exerc_max muito baixo, surgem reprovações por probabilidade e
     nenhuma opção fica 'ok'."""

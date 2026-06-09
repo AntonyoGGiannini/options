@@ -93,9 +93,9 @@ def rankear_calls(
 
     cond_prob = df["prob_exercicio_final"] <= config.prob_exerc_max
     cond_strike = df["distancia_strike_pct"] >= config.min_distancia_strike_pct
-    cond_retorno = df["retorno_anualizado_liquido"] > 0
+    cond_retorno = df["retorno_anualizado_liquido"] > config.min_retorno_anualizado_liquido
     cond_lucro = (
-        df["lucro_se_exercido"] > 0
+        df["lucro_se_exercido"] > config.min_lucro_se_exercido
         if excluir_prejuizo_exercicio
         else pd.Series(True, index=df.index)
     )

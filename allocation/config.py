@@ -7,6 +7,7 @@ aqui, num único lugar, em vez de espalhada pelo código de execução.
 
 from __future__ import annotations
 
+import math
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -47,6 +48,13 @@ class Config:
     # Distância mínima do strike em relação ao preço atual (ex.: 0.0 = ATM+,
     # -0.05 = permite até 5% ITM). Default 0.0 mantém comportamento anterior (OTM).
     min_distancia_strike_pct: float = 0.0
+
+    # --- filtros de retorno/lucro ---
+    # Limiares mínimos (estritos) para o ranking. Defaults 0.0 preservam o
+    # comportamento original (> 0); valores negativos relaxam o filtro
+    # deliberadamente (ex.: aceitar operações break-even ou pequeno prejuízo).
+    min_retorno_anualizado_liquido: float = 0.0
+    min_lucro_se_exercido: float = 0.0
 
     # --- filtro de liquidez ---
     # Limiares de liquidez da cadeia de opções. Não descartam mais a opção: o
@@ -109,6 +117,10 @@ class Config:
             raise ValueError("intervalo de dias inválido (min_dias/max_dias)")
         if self.min_distancia_strike_pct < -1.0:
             raise ValueError("min_distancia_strike_pct não pode ser menor que -1.0")
+        if not math.isfinite(self.min_retorno_anualizado_liquido):
+            raise ValueError("min_retorno_anualizado_liquido deve ser um número finito")
+        if not math.isfinite(self.min_lucro_se_exercido):
+            raise ValueError("min_lucro_se_exercido deve ser um número finito")
         if self.liquidez_volume_min < 0 or self.liquidez_open_interest_min < 0:
             raise ValueError("limiares de liquidez (volume/open interest) não podem ser negativos")
         if self.liquidez_spread_max < 0:
