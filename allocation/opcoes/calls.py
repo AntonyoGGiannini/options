@@ -191,6 +191,7 @@ def processar_ativo(
             salvar_dados_mock(
                 ativo, dados.df_calls, dados.preco_atual,
                 dados.historico_precos, config.pasta_mock,
+                df_puts=dados.df_puts,
             )
 
         if dados.df_calls.empty:
