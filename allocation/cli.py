@@ -19,6 +19,7 @@ from allocation.runner import (
     executar_e_reportar,
     executar_e_reportar_puts,
     executar_hedge,
+    executar_spreads,
     executar_volatilidade,
 )
 
@@ -75,6 +76,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="Preço médio de aquisição da posição (default: preço de mercado).")
     hg.add_argument("--saida", default=None,
                     help="Arquivo Excel de saída (abas: protective_put, collar).")
+
+    sp = sub.add_parser("spreads", help="Avaliação de spreads (bull call, iron condor).")
+    sp.add_argument("--estrategia", default="bull_call",
+                    choices=["bull_call", "iron_condor"],
+                    help="Estratégia multi-perna a avaliar.")
+    sp.add_argument("--saida", default=None,
+                    help="Arquivo Excel de saída com todos os spreads avaliados.")
 
     bt = sub.add_parser("backtest", help="Backtest da estratégia sobre o histórico.")
     bt.add_argument("--distancia", type=float, default=0.05,
@@ -140,6 +148,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         tem_resultado = any(not df.empty for df in resultado.values())
         return 0 if tem_resultado else 1
+
+    if args.comando == "spreads":
+        df_spreads = executar_spreads(
+            config, estrategia=args.estrategia, arquivo_saida=args.saida,
+        )
+        return 0 if not df_spreads.empty else 1
 
     if args.comando == "backtest":
         df = executar_backtest(

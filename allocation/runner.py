@@ -14,6 +14,7 @@ from allocation.opcoes.backtest import backtest_covered_call
 from allocation.opcoes.calls import processar_ativo
 from allocation.opcoes.hedge import avaliar_collar, avaliar_protective_put
 from allocation.opcoes.puts import processar_ativo_puts
+from allocation.opcoes.spreads import avaliar_bull_call_spreads, avaliar_iron_condors
 from allocation.opcoes.volatilidade import analisar_volatilidade
 from allocation.report import (
     gerar_grafico_melhor,
@@ -246,6 +247,51 @@ def executar_hedge(
         logger.info("Análise de hedge salva em: %s", arquivo_saida)
 
     return {"protective_put": df_pp, "collar": df_collar}
+
+
+def executar_spreads(
+    config: Config,
+    estrategia: str = "bull_call",
+    top_n: int | None = None,
+    provedor: ProvedorDados | None = None,
+    arquivo_saida: str | None = None,
+) -> pd.DataFrame:
+    """Avalia spreads (bull_call ou iron_condor) para cada ativo da config.
+
+    Imprime os melhores candidatos por ativo e retorna o consolidado; se
+    ``arquivo_saida`` for informado, salva o resultado completo em Excel.
+    """
+    if estrategia not in {"bull_call", "iron_condor"}:
+        raise ValueError("estrategia deve ser: bull_call ou iron_condor")
+    if provedor is None:
+        provedor = construir_provedor(config)
+    n = top_n if top_n is not None else config.top_n
+    avaliar = avaliar_bull_call_spreads if estrategia == "bull_call" else avaliar_iron_condors
+
+    resultados = []
+    for ativo in config.lista_ativos:
+        logger.info(">>> Avaliando %s de %s...", estrategia, ativo)
+        try:
+            dados = provedor.obter(ativo, config.periodo_historico)
+        except Exception as exc:  # noqa: BLE001 — isola falha por ativo
+            logger.error("[%s] Erro ao obter dados: %s", ativo, exc)
+            continue
+        df = avaliar(dados, config)
+        if df.empty:
+            continue
+        resultados.append(df)
+        print(f"\n=== {ativo} — {estrategia} (melhores por score) ===")
+        print(df.head(n).to_string(index=False))
+
+    if not resultados:
+        logger.warning("Nenhum spread viável para os ativos analisados.")
+        return pd.DataFrame()
+
+    df_final = pd.concat(resultados, ignore_index=True)
+    if arquivo_saida:
+        df_final.to_excel(arquivo_saida, index=False)
+        logger.info("Análise de spreads salva em: %s", arquivo_saida)
+    return df_final
 
 
 def executar_backtest(
