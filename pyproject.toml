@@ -28,6 +28,9 @@ dev = [
 docs = [
     "python-pptx>=1.0.0",
 ]
+app = [
+    "streamlit>=1.40.0",
+]
 
 [project.scripts]
 allocation = "allocation.cli:main"
