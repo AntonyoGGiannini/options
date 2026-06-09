@@ -25,6 +25,9 @@ dev = [
     "mypy>=1.10.0",
     "pandas-stubs",
 ]
+docs = [
+    "python-pptx>=1.0.0",
+]
 
 [project.scripts]
 allocation = "allocation.cli:main"
