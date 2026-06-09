@@ -8,9 +8,10 @@ atributos do produto.
 
 Tabela final que une as recomendações de **Bonds, ETFs, Fundos, Stocks e UCITS**.
 
-> Observação: no `INSERT` final, `STOCKS_RECOMENDADOS` está **comentado** — ou
-> seja, atualmente a tabela é populada apenas com Bonds, ETFs, Fundos e UCITS.
-> A view de Stocks existe e está pronta para ser reativada.
+> Observação: no `INSERT` final, `STOCKS_RECOMENDADOS` está **comentado**
+> intencionalmente — o modelo de alocação **não indica ações individuais**, então
+> a tabela é populada apenas com Bonds, ETFs, Fundos e UCITS. A view de Stocks é
+> mantida pronta caso essa decisão mude.
 
 ### Fonte por classe
 
@@ -95,5 +96,6 @@ Atributos derivados:
 | `bonds_rating_avenue`  | `bonds_rating_avenue`                                          |
 | `bonds_duration_avenue`| `bonds_duration_avenue`                                        |
 
-> `aplicacao_minima` de Funds aparece fixada em `1000`; o valor real
-> (`fundos_minimum_initial_subscription_amount`) está comentado como alternativa.
+> `aplicacao_minima` de Funds está fixada em `1000` como contorno: o campo real
+> (`fundos_minimum_initial_subscription_amount`) está com **erro na ingestão**.
+> Quando a ingestão for corrigida, basta trocar pela coluna comentada.
