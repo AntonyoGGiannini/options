@@ -33,7 +33,7 @@ def _iv_atm(grupo: pd.DataFrame, preco_atual: float) -> float:
     if ivs.empty:
         return float("nan")
     idx = (ivs["strike"] - preco_atual).abs().idxmin()
-    return float(ivs.loc[idx, "impliedVolatility"])
+    return float(ivs["impliedVolatility"].loc[idx])
 
 
 def term_structure_iv(df_opcoes: pd.DataFrame, preco_atual: float) -> pd.DataFrame:
@@ -138,7 +138,7 @@ def skew_por_vencimento(
         if ivs.empty:
             return float("nan")
         idx = (ivs["strike"] - alvo).abs().idxmin()
-        return float(ivs.loc[idx, "impliedVolatility"])
+        return float(ivs["impliedVolatility"].loc[idx])
 
     calls = df_calls.copy()
     calls["dias_vencimento"] = _dias_ate(calls["expiration"])
