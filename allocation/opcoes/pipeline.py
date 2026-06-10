@@ -23,10 +23,7 @@ def calcular_premio_vetor(df, usar_premio):
     if usar_premio == "lastPrice":
         return df["lastPrice"]
     if usar_premio == "mid":
-        mid_valido = (
-            df["bid"].notna() & df["ask"].notna()
-            & (df["bid"] > 0) & (df["ask"] > 0)
-        )
+        mid_valido = df["bid"].notna() & df["ask"].notna() & (df["bid"] > 0) & (df["ask"] > 0)
         return ((df["bid"] + df["ask"]) / 2).where(mid_valido, df["lastPrice"])
     raise ValueError("usar_premio deve ser: bid, ask, lastPrice ou mid")
 
@@ -48,6 +45,7 @@ def preparar_opcoes_para_modelo(
     liquidez_open_interest_min=500,
     liquidez_spread_max=0.15,
     tipo="call",
+    data_referencia=None,
 ):
     """
     Calcula métricas de contrato por cadeia de opções (calls ou puts).
@@ -58,6 +56,11 @@ def preparar_opcoes_para_modelo(
     greeks de put, prob empírica conta quedas até o strike e
     distancia_strike_pct = 1 − strike/spot (positivo = OTM abaixo do spot, mesma
     semântica de "distância OTM mínima" do filtro).
+
+    data_referencia: data "de hoje" usada para contar dias até o vencimento
+    (None = data corrente). Permite replay histórico: com um snapshot de cadeia
+    de uma data passada, passe essa data para reproduzir o screener como ele
+    teria rodado naquele pregão.
 
     Premissas:
     - Greeks e prob d2 assumem exercício europeu (Black-Scholes). O flag
@@ -88,13 +91,16 @@ def preparar_opcoes_para_modelo(
     if "spread_pct" not in df.columns:
         df["spread_pct"] = (df["ask"] - df["bid"]) / df["mid"]
 
-    df["preco_atual"] = preco_atual
-    df["dias_vencimento"] = (
-        pd.to_datetime(df["expiration"]).dt.normalize()
-        - pd.Timestamp.today().normalize()
-    ).dt.days
+    referencia = (
+        pd.Timestamp(data_referencia).normalize()
+        if data_referencia is not None
+        else pd.Timestamp.today().normalize()
+    )
 
-    hoje = pd.Timestamp.today().normalize().date()
+    df["preco_atual"] = preco_atual
+    df["dias_vencimento"] = (pd.to_datetime(df["expiration"]).dt.normalize() - referencia).dt.days
+
+    hoje = referencia.date()
     df["dias_uteis_ate_vencimento"] = df["expiration"].apply(
         lambda x: int(np.busday_count(hoje, pd.Timestamp(x).date()))
     )
@@ -144,8 +150,12 @@ def preparar_opcoes_para_modelo(
             else calcular_prob_exercicio_put_vetor
         )
         df["prob_exercicio"] = calcular_prob(
-            df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
-            df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada
+            df["preco_atual"].to_numpy(),
+            df["strike"].to_numpy(),
+            df["T"].to_numpy(),
+            taxa_livre_risco,
+            dividend_yield,
+            iv_usada,
         )
     else:
         df["prob_exercicio"] = np.nan
@@ -153,8 +163,12 @@ def preparar_opcoes_para_modelo(
     # --- Greeks (Black-Scholes) ---
     calcular_greeks = calcular_greeks_call if tipo == "call" else calcular_greeks_put
     greeks = calcular_greeks(
-        df["preco_atual"].to_numpy(), df["strike"].to_numpy(),
-        df["T"].to_numpy(), taxa_livre_risco, dividend_yield, iv_usada,
+        df["preco_atual"].to_numpy(),
+        df["strike"].to_numpy(),
+        df["T"].to_numpy(),
+        taxa_livre_risco,
+        dividend_yield,
+        iv_usada,
     )
     df["delta"] = greeks["delta"]
     df["gamma"] = greeks["gamma"]
