@@ -12,7 +12,7 @@ from allocation.models.black_scholes import (
 
 
 def _d2_analitico(S0, K, T, r, q, iv):
-    return (np.log(S0 / K) + (r - q - 0.5 * iv ** 2) * T) / (iv * np.sqrt(T))
+    return (np.log(S0 / K) + (r - q - 0.5 * iv**2) * T) / (iv * np.sqrt(T))
 
 
 def test_d2_bate_com_valor_analitico():
@@ -46,15 +46,20 @@ def test_vetor_igual_ao_escalar():
     K = np.array([90.0, 100.0, 120.0])
     T, r, q, iv = 0.5, 0.045, 0.0, 0.25
     vet = calcular_prob_exercicio_risk_neutral_vetor(S0, K, T, r, q, iv)
-    esc = [calcular_prob_exercicio_risk_neutral(s, k, T, r, q, iv)
-           for s, k in zip(S0, K, strict=True)]
+    esc = [
+        calcular_prob_exercicio_risk_neutral(s, k, T, r, q, iv) for s, k in zip(S0, K, strict=True)
+    ]
     np.testing.assert_allclose(vet, esc, rtol=1e-12)
 
 
 def test_vetor_propaga_nan_em_T_invalido():
     probs = calcular_prob_exercicio_risk_neutral_vetor(
-        np.array([100.0, 100.0]), np.array([105.0, 105.0]),
-        np.array([0.5, 0.0]), 0.045, 0.0, np.array([0.25, 0.25]),
+        np.array([100.0, 100.0]),
+        np.array([105.0, 105.0]),
+        np.array([0.5, 0.0]),
+        0.045,
+        0.0,
+        np.array([0.25, 0.25]),
     )
     assert not np.isnan(probs[0])
     assert np.isnan(probs[1])

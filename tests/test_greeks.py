@@ -34,7 +34,9 @@ def test_delta_via_diferencas_finitas():
 def test_vega_via_diferencas_finitas():
     S, K, T, r, q, iv = 100.0, 105.0, 0.5, 0.03, 0.0, 0.25
     h = 1e-5
-    vega_fd = (preco_call_bs(S, K, T, r, q, iv + h) - preco_call_bs(S, K, T, r, q, iv - h)) / (2 * h)
+    vega_fd = (preco_call_bs(S, K, T, r, q, iv + h) - preco_call_bs(S, K, T, r, q, iv - h)) / (
+        2 * h
+    )
     g = calcular_greeks_call(S, K, T, r, q, iv)
     assert abs(g["vega"] - vega_fd) < 1e-2
 
@@ -46,8 +48,12 @@ def test_invalidos_retornam_nan():
 
 def test_vetorizado():
     g = calcular_greeks_call(
-        np.array([100.0, 100.0]), np.array([90.0, 130.0]),
-        0.5, 0.045, 0.0, 0.25,
+        np.array([100.0, 100.0]),
+        np.array([90.0, 130.0]),
+        0.5,
+        0.045,
+        0.0,
+        0.25,
     )
     # Call mais ITM tem delta maior.
     assert g["delta"][0] > g["delta"][1]

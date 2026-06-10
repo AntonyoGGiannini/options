@@ -8,8 +8,9 @@ import pandas as pd
 DIAS_PREGAO_ANO = 252
 
 
-def volatilidade_realizada(precos: pd.Series, janela: int | None = None,
-                           dias_ano: int = DIAS_PREGAO_ANO) -> float:
+def volatilidade_realizada(
+    precos: pd.Series, janela: int | None = None, dias_ano: int = DIAS_PREGAO_ANO
+) -> float:
     """Volatilidade anualizada a partir dos log-retornos diários.
 
     janela: usa apenas os últimos N pregões (None = série inteira).

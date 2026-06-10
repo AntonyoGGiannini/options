@@ -6,4 +6,5 @@ Output: ranking de candidatos a compor carteira de covered calls.
 
 TODO: implementar via allocation.data.ProvedorDados (histórico + .info)
 """
+
 from __future__ import annotations

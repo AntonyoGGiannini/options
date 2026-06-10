@@ -43,6 +43,36 @@ COLUNAS_OUTPUT = [
 ]
 
 
+COLUNAS_OUTPUT_PUTS = [
+    "ativo",
+    "ranking_ativo",
+    "strike",
+    "premio",
+    "expiration",
+    "dias_uteis_ate_vencimento",
+    "prob_exercicio",
+    "prob_empirica",
+    "prob_exercicio_final",
+    "delta",
+    "theta",
+    "vega",
+    "fonte_vol",
+    "risco_atribuicao_antecipada",
+    "retorno_anualizado_pct",
+    "retorno_anualizado_liquido",
+    "colateral_por_contrato",
+    "preco_efetivo_se_exercido",
+    "desconto_vs_spot",
+    "custo_exercicio_contrato",
+    "bid",
+    "ask",
+    "volume",
+    "openInterest",
+    "preco_atual_ativo",
+    "score_venda",
+]
+
+
 COLUNAS_MATRIZ = [
     "ativo",
     "strike",
@@ -67,6 +97,12 @@ COLUNAS_MATRIZ = [
 def montar_output(df_final: pd.DataFrame) -> pd.DataFrame:
     """Seleciona as colunas de saída presentes no DataFrame."""
     colunas = [c for c in COLUNAS_OUTPUT if c in df_final.columns]
+    return df_final[colunas].copy()
+
+
+def montar_output_puts(df_final: pd.DataFrame) -> pd.DataFrame:
+    """Seleciona as colunas de saída de puts presentes no DataFrame."""
+    colunas = [c for c in COLUNAS_OUTPUT_PUTS if c in df_final.columns]
     return df_final[colunas].copy()
 
 
@@ -104,8 +140,13 @@ def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
     logger.info(
         "Melhor opção geral: %s | Strike %s | Venc. %s | Score %.4f | "
         "Prob. final %.2f%% (d2=%.2f%%, empírica=%s)",
-        ativo_melhor, melhor["strike"], melhor["expiration"], melhor["score_venda"],
-        melhor["prob_exercicio_final"] * 100, melhor["prob_exercicio"] * 100, prob_emp_str,
+        ativo_melhor,
+        melhor["strike"],
+        melhor["expiration"],
+        melhor["score_venda"],
+        melhor["prob_exercicio_final"] * 100,
+        melhor["prob_exercicio"] * 100,
+        prob_emp_str,
     )
 
     arquivo = gerar_grafico_payoff_covered_call(

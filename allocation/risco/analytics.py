@@ -6,4 +6,5 @@ drawdown e max drawdown, matriz de correlação, stress test
 
 TODO: implementar sobre dados do portfolio.py e allocation.models.*
 """
+
 from __future__ import annotations

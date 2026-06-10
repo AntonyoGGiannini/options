@@ -7,6 +7,7 @@ aqui, num único lugar, em vez de espalhada pelo código de execução.
 
 from __future__ import annotations
 
+import math
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -48,6 +49,13 @@ class Config:
     # -0.05 = permite até 5% ITM). Default 0.0 mantém comportamento anterior (OTM).
     min_distancia_strike_pct: float = 0.0
 
+    # --- filtros de retorno/lucro ---
+    # Limiares mínimos (estritos) para o ranking. Defaults 0.0 preservam o
+    # comportamento original (> 0); valores negativos relaxam o filtro
+    # deliberadamente (ex.: aceitar operações break-even ou pequeno prejuízo).
+    min_retorno_anualizado_liquido: float = 0.0
+    min_lucro_se_exercido: float = 0.0
+
     # --- filtro de liquidez ---
     # Limiares de liquidez da cadeia de opções. Não descartam mais a opção: o
     # pipeline calcula a flag passou_liquidez e o ranking a usa como condição.
@@ -66,6 +74,12 @@ class Config:
     custo_exercicio_min: float = 10.0
     custo_exercicio: float = 0.0  # taxa fixa adicional por contrato (opcional)
 
+    # --- chains históricas (replay/validação de parâmetros) ---
+    pasta_chains: str = "chains_historicas"
+    # grade de parâmetros do subcomando backtest-chains --grid: tabela TOML
+    # [grade_validacao] com campo da Config -> lista de valores a combinar.
+    grade_validacao: dict[str, list] | None = None
+
     # --- dados ---
     modo_offline: bool = False
     salvar_mock: bool = False
@@ -82,6 +96,9 @@ class Config:
     arquivo_excel: str = "top_opcoes_covered_call.xlsx"
     # matriz completa de candidatas (todas as opções, com coluna de status)
     arquivo_matriz: str = "matriz_opcoes.xlsx"
+    # saídas da análise de puts cash-secured (subcomando puts)
+    arquivo_excel_puts: str = "top_opcoes_puts.xlsx"
+    arquivo_matriz_puts: str = "matriz_opcoes_puts.xlsx"
 
     def __post_init__(self) -> None:
         self.validar()
@@ -109,6 +126,10 @@ class Config:
             raise ValueError("intervalo de dias inválido (min_dias/max_dias)")
         if self.min_distancia_strike_pct < -1.0:
             raise ValueError("min_distancia_strike_pct não pode ser menor que -1.0")
+        if not math.isfinite(self.min_retorno_anualizado_liquido):
+            raise ValueError("min_retorno_anualizado_liquido deve ser um número finito")
+        if not math.isfinite(self.min_lucro_se_exercido):
+            raise ValueError("min_lucro_se_exercido deve ser um número finito")
         if self.liquidez_volume_min < 0 or self.liquidez_open_interest_min < 0:
             raise ValueError("limiares de liquidez (volume/open interest) não podem ser negativos")
         if self.liquidez_spread_max < 0:
@@ -123,6 +144,14 @@ class Config:
             raise ValueError("custo_exercicio_min não pode ser negativo")
         if self.cache_ttl_horas < 0:
             raise ValueError("cache_ttl_horas não pode ser negativo")
+        if self.grade_validacao is not None:
+            nomes = {f.name for f in fields(self)}
+            invalidos = set(self.grade_validacao) - nomes
+            if invalidos:
+                raise ValueError(f"grade_validacao com campos desconhecidos: {sorted(invalidos)}")
+            for chave, valores in self.grade_validacao.items():
+                if not isinstance(valores, list) or not valores:
+                    raise ValueError(f"grade_validacao[{chave!r}] deve ser uma lista não-vazia")
         if self.peso_theta < 0:
             raise ValueError("peso_theta não pode ser negativo")
         if self.peso_vega < 0:
