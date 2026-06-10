@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import asdict, dataclass
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -231,7 +232,7 @@ def replay_screener_chains(
             strike = float(row["strike"])
             bid = float(row["bid"])
             premio_liq = bid - config.custo_venda / config.tamanho_contrato
-            s_t = float(serie_liq.asof(expiracao))
+            s_t = float(cast("float", serie_liq.asof(expiracao)))
             exercido = s_t > strike
             custo_exerc = (
                 config.custo_exercicio_para(strike) / config.tamanho_contrato if exercido else 0.0
