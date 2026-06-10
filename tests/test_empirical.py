@@ -11,8 +11,11 @@ from allocation.models.empirical import calcular_probabilidade_empirica_batch
 def test_historico_curto_nao_usa_empirica():
     precos = pd.Series([100.0, 101.0, 102.0])  # poucas amostras
     probs, usa = calcular_probabilidade_empirica_batch(
-        precos, np.array([100.0]), np.array([105.0]),
-        np.array([1]), min_amostras=30,
+        precos,
+        np.array([100.0]),
+        np.array([105.0]),
+        np.array([1]),
+        min_amostras=30,
     )
     assert not usa[0]
     assert np.isnan(probs[0])
@@ -23,8 +26,11 @@ def test_serie_sempre_subindo_da_prob_alta_para_strike_baixo():
     # logo a prob de superar um strike levemente acima é 1.0.
     precos = pd.Series(np.linspace(100.0, 200.0, 200))
     probs, usa = calcular_probabilidade_empirica_batch(
-        precos, np.array([100.0]), np.array([100.5]),
-        np.array([5]), min_amostras=30,
+        precos,
+        np.array([100.0]),
+        np.array([100.5]),
+        np.array([5]),
+        min_amostras=30,
     )
     assert usa[0]
     assert probs[0] == 1.0
@@ -34,8 +40,11 @@ def test_strike_inalcancavel_da_prob_zero():
     precos = pd.Series(np.linspace(100.0, 110.0, 200))
     # Strike 1000% acima — nunca atingido no histórico.
     probs, usa = calcular_probabilidade_empirica_batch(
-        precos, np.array([100.0]), np.array([1000.0]),
-        np.array([5]), min_amostras=30,
+        precos,
+        np.array([100.0]),
+        np.array([1000.0]),
+        np.array([5]),
+        min_amostras=30,
     )
     assert usa[0]
     assert probs[0] == 0.0

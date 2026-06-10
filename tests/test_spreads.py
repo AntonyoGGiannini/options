@@ -13,8 +13,10 @@ from allocation.opcoes.spreads import avaliar_bull_call_spreads, avaliar_iron_co
 def config_spreads(pasta_mock):
     return Config(
         lista_ativos=["IBIT"],
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
 
 
@@ -52,9 +54,7 @@ def test_bull_call_prob_decresce_com_breakeven(dados_ibit, config_spreads):
 
 def test_bull_call_largura_respeitada(dados_ibit, config_spreads):
     largura_max_pct = 0.10
-    df = avaliar_bull_call_spreads(
-        dados_ibit, config_spreads, largura_max_pct=largura_max_pct
-    )
+    df = avaliar_bull_call_spreads(dados_ibit, config_spreads, largura_max_pct=largura_max_pct)
     if df.empty:
         pytest.skip("sem pares na largura restrita")
     assert (df["largura"] <= largura_max_pct * dados_ibit.preco_atual + 1e-9).all()

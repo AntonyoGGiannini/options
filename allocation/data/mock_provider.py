@@ -78,7 +78,8 @@ class ProvedorMock:
             logger.warning(
                 "[%s] Mock sem puts (%s ausente); análises de puts ficarão vazias. "
                 "Rode online com salvar_mock=True para regenerar.",
-                ativo, arquivo_puts,
+                ativo,
+                arquivo_puts,
             )
 
         historico_df = pd.read_csv(
@@ -93,7 +94,11 @@ class ProvedorMock:
         logger.info(
             "Dados mock carregados: %s | preco_atual=%.2f | calls=%d | puts=%d | "
             "historico=%d pregões",
-            ativo, preco_atual, len(df_calls), len(df_puts), len(historico_precos),
+            ativo,
+            preco_atual,
+            len(df_calls),
+            len(df_puts),
+            len(historico_precos),
         )
         return DadosMercado(
             ativo=ativo,

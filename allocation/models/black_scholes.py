@@ -21,11 +21,9 @@ def preco_call_bs(S0, K, T, r, q, iv):
     precos = np.full(S0_arr.shape, np.nan, dtype=float)
     validos = (T_arr > 0) & (iv_arr > 0) & (K_arr > 0) & (S0_arr > 0)
     s, k, t, v = S0_arr[validos], K_arr[validos], T_arr[validos], iv_arr[validos]
-    d1 = (np.log(s / k) + (r - q + 0.5 * v ** 2) * t) / (v * np.sqrt(t))
+    d1 = (np.log(s / k) + (r - q + 0.5 * v**2) * t) / (v * np.sqrt(t))
     d2 = d1 - v * np.sqrt(t)
-    precos[validos] = (
-        s * np.exp(-q * t) * norm.cdf(d1) - k * np.exp(-r * t) * norm.cdf(d2)
-    )
+    precos[validos] = s * np.exp(-q * t) * norm.cdf(d1) - k * np.exp(-r * t) * norm.cdf(d2)
     return precos if precos.ndim else float(precos)
 
 
@@ -44,11 +42,9 @@ def preco_put_bs(S0, K, T, r, q, iv):
     precos = np.full(S0_arr.shape, np.nan, dtype=float)
     validos = (T_arr > 0) & (iv_arr > 0) & (K_arr > 0) & (S0_arr > 0)
     s, k, t, v = S0_arr[validos], K_arr[validos], T_arr[validos], iv_arr[validos]
-    d1 = (np.log(s / k) + (r - q + 0.5 * v ** 2) * t) / (v * np.sqrt(t))
+    d1 = (np.log(s / k) + (r - q + 0.5 * v**2) * t) / (v * np.sqrt(t))
     d2 = d1 - v * np.sqrt(t)
-    precos[validos] = (
-        k * np.exp(-r * t) * norm.cdf(-d2) - s * np.exp(-q * t) * norm.cdf(-d1)
-    )
+    precos[validos] = k * np.exp(-r * t) * norm.cdf(-d2) - s * np.exp(-q * t) * norm.cdf(-d1)
     return precos if precos.ndim else float(precos)
 
 
@@ -56,7 +52,7 @@ def calcular_prob_exercicio_risk_neutral(S0, K, T, r, q, iv):
     """Probabilidade risk-neutral (Black-Scholes d2) de a call terminar ITM."""
     if T <= 0 or iv <= 0 or K <= 0 or S0 <= 0:
         return np.nan
-    d2 = (np.log(S0 / K) + (r - q - 0.5 * iv ** 2) * T) / (iv * np.sqrt(T))
+    d2 = (np.log(S0 / K) + (r - q - 0.5 * iv**2) * T) / (iv * np.sqrt(T))
     return float(norm.cdf(d2))
 
 

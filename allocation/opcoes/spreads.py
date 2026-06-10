@@ -24,13 +24,19 @@ from allocation.opcoes.pipeline import (
 logger = obter_logger(__name__)
 
 _COLUNAS_PERNA = [
-    "expiration", "strike", "premio", "iv_usada", "passou_liquidez",
-    "T", "dias_vencimento",
+    "expiration",
+    "strike",
+    "premio",
+    "iv_usada",
+    "passou_liquidez",
+    "T",
+    "dias_vencimento",
 ]
 
 
-def _preparar_perna(df_opcoes, dados: DadosMercado, config: Config,
-                    usar_premio: str, tipo: str) -> pd.DataFrame:
+def _preparar_perna(
+    df_opcoes, dados: DadosMercado, config: Config, usar_premio: str, tipo: str
+) -> pd.DataFrame:
     """Pipeline de uma perna (sem modelos de probabilidade — a prob de lucro do
     spread é calculada no break-even, não por perna)."""
     if df_opcoes.empty:
@@ -99,61 +105,80 @@ def avaliar_bull_call_spreads(
 
     pares["largura"] = pares["strike_venda"] - pares["strike_compra"]
     pares["debito"] = (
-        pares["premio_compra"] - pares["premio_venda"]
-        + custo_compra_por_acao + custo_venda_por_acao
+        pares["premio_compra"]
+        - pares["premio_venda"]
+        + custo_compra_por_acao
+        + custo_venda_por_acao
     )
     pares["lucro_max"] = pares["largura"] - pares["debito"]
     pares["perda_max"] = pares["debito"]
     pares["breakeven"] = pares["strike_compra"] + pares["debito"]
     pares["liquidez_ok"] = pares["passou_liquidez_compra"] & pares["passou_liquidez_venda"]
 
-    pares = pares[
-        (pares["debito"] > 0) & (pares["lucro_max"] > 0) & pares["liquidez_ok"]
-    ].copy()
+    pares = pares[(pares["debito"] > 0) & (pares["lucro_max"] > 0) & pares["liquidez_ok"]].copy()
     if pares.empty:
         logger.info("[%s] Nenhum bull call spread com lucro possível e liquidez.", dados.ativo)
         return pd.DataFrame()
 
     # IV no break-even interpolada linearmente entre as IVs usadas das pernas
-    frac = (
-        (pares["breakeven"] - pares["strike_compra"]) / pares["largura"]
-    ).clip(0, 1)
+    frac = ((pares["breakeven"] - pares["strike_compra"]) / pares["largura"]).clip(0, 1)
     iv_be = pares["iv_usada_compra"] + frac * (pares["iv_usada_venda"] - pares["iv_usada_compra"])
 
     # prob de lucro: terminar acima do break-even (risk-neutral)
     pares["prob_lucro"] = calcular_prob_exercicio_risk_neutral_vetor(
-        spot, pares["breakeven"].to_numpy(), pares["T_compra"].to_numpy(),
-        config.taxa_livre_risco, config.dividend_para(dados.ativo),
+        spot,
+        pares["breakeven"].to_numpy(),
+        pares["T_compra"].to_numpy(),
+        config.taxa_livre_risco,
+        config.dividend_para(dados.ativo),
         iv_be.to_numpy(),
     )
     pares["retorno_max_pct"] = pares["lucro_max"] / pares["debito"]
     pares["score_spread"] = pares["retorno_max_pct"] * pares["prob_lucro"]
 
     pares["ativo"] = dados.ativo
-    pares = pares.rename(columns={
-        "strike_compra": "strike_long", "strike_venda": "strike_short",
-        "premio_compra": "premio_long", "premio_venda": "premio_short",
-        "dias_vencimento_compra": "dias_vencimento",
-    })
+    pares = pares.rename(
+        columns={
+            "strike_compra": "strike_long",
+            "strike_venda": "strike_short",
+            "premio_compra": "premio_long",
+            "premio_venda": "premio_short",
+            "dias_vencimento_compra": "dias_vencimento",
+        }
+    )
     colunas = [
-        "ativo", "expiration", "dias_vencimento", "strike_long", "strike_short",
-        "premio_long", "premio_short", "largura", "debito", "lucro_max",
-        "perda_max", "breakeven", "retorno_max_pct", "prob_lucro",
-        "score_spread", "liquidez_ok",
+        "ativo",
+        "expiration",
+        "dias_vencimento",
+        "strike_long",
+        "strike_short",
+        "premio_long",
+        "premio_short",
+        "largura",
+        "debito",
+        "lucro_max",
+        "perda_max",
+        "breakeven",
+        "retorno_max_pct",
+        "prob_lucro",
+        "score_spread",
+        "liquidez_ok",
     ]
     pares = pares[colunas].sort_values("score_spread", ascending=False)
     pares = pares.groupby("expiration", group_keys=False).head(max_por_vencimento)
     return pares.sort_values("score_spread", ascending=False, ignore_index=True)
 
 
-def _spreads_credito_adjacentes(perna_venda: pd.DataFrame, perna_compra: pd.DataFrame,
-                                lado: str) -> pd.DataFrame:
+def _spreads_credito_adjacentes(
+    perna_venda: pd.DataFrame, perna_compra: pd.DataFrame, lado: str
+) -> pd.DataFrame:
     """Spreads de crédito com strikes adjacentes (perna comprada vizinha da
     vendida): put = proteção no strike imediatamente abaixo; call = no
     imediatamente acima. Retorna um spread por strike vendido."""
     base = perna_venda.merge(
         perna_compra[["expiration", "strike", "premio", "passou_liquidez"]],
-        on=["expiration", "strike"], suffixes=("_venda", "_compra"),
+        on=["expiration", "strike"],
+        suffixes=("_venda", "_compra"),
     )
     if base.empty:
         return base
@@ -211,11 +236,13 @@ def avaliar_iron_condors(
     # cap combinatório: melhores asas (maior crédito) por vencimento
     asa_put = (
         asa_put.sort_values("credito", ascending=False)
-        .groupby("expiration", group_keys=False).head(max_por_vencimento)
+        .groupby("expiration", group_keys=False)
+        .head(max_por_vencimento)
     )
     asa_call = (
         asa_call.sort_values("credito", ascending=False)
-        .groupby("expiration", group_keys=False).head(max_por_vencimento)
+        .groupby("expiration", group_keys=False)
+        .head(max_por_vencimento)
     )
 
     condors = asa_put.merge(asa_call, on="expiration", suffixes=("_put", "_call"))
@@ -243,28 +270,50 @@ def avaliar_iron_condors(
     # prob(BE_inf < S_T < BE_sup) = N(d2)(BE_inf) − N(d2)(BE_sup). IV de cada
     # break-even = IV usada do strike vendido da asa correspondente.
     prob_acima_inf = calcular_prob_exercicio_risk_neutral_vetor(
-        spot, condors["breakeven_inferior"].to_numpy(), condors["T_put"].to_numpy(),
-        config.taxa_livre_risco, q, condors["iv_usada_put"].to_numpy(),
+        spot,
+        condors["breakeven_inferior"].to_numpy(),
+        condors["T_put"].to_numpy(),
+        config.taxa_livre_risco,
+        q,
+        condors["iv_usada_put"].to_numpy(),
     )
     prob_acima_sup = calcular_prob_exercicio_risk_neutral_vetor(
-        spot, condors["breakeven_superior"].to_numpy(), condors["T_call"].to_numpy(),
-        config.taxa_livre_risco, q, condors["iv_usada_call"].to_numpy(),
+        spot,
+        condors["breakeven_superior"].to_numpy(),
+        condors["T_call"].to_numpy(),
+        config.taxa_livre_risco,
+        q,
+        condors["iv_usada_call"].to_numpy(),
     )
     condors["prob_lucro"] = np.clip(prob_acima_inf - prob_acima_sup, 0.0, 1.0)
     condors["score_condor"] = (condors["credito"] / condors["perda_max"]) * condors["prob_lucro"]
 
     condors["ativo"] = dados.ativo
-    condors = condors.rename(columns={
-        "strike_put": "strike_put_short", "strike_protecao_put": "strike_put_long",
-        "strike_call": "strike_call_short", "strike_protecao_call": "strike_call_long",
-        "dias_vencimento_put": "dias_vencimento",
-    })
+    condors = condors.rename(
+        columns={
+            "strike_put": "strike_put_short",
+            "strike_protecao_put": "strike_put_long",
+            "strike_call": "strike_call_short",
+            "strike_protecao_call": "strike_call_long",
+            "dias_vencimento_put": "dias_vencimento",
+        }
+    )
     colunas = [
-        "ativo", "expiration", "dias_vencimento",
-        "strike_put_long", "strike_put_short", "strike_call_short", "strike_call_long",
-        "credito", "largura_max", "perda_max",
-        "breakeven_inferior", "breakeven_superior",
-        "prob_lucro", "score_condor", "liquidez_ok",
+        "ativo",
+        "expiration",
+        "dias_vencimento",
+        "strike_put_long",
+        "strike_put_short",
+        "strike_call_short",
+        "strike_call_long",
+        "credito",
+        "largura_max",
+        "perda_max",
+        "breakeven_inferior",
+        "breakeven_superior",
+        "prob_lucro",
+        "score_condor",
+        "liquidez_ok",
     ]
     condors = condors[colunas].sort_values("score_condor", ascending=False)
     condors = condors.groupby("expiration", group_keys=False).head(max_por_vencimento)

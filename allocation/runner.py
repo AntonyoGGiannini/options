@@ -7,10 +7,16 @@ import pandas as pd
 from allocation.config import Config
 from allocation.data.base import ProvedorDados
 from allocation.data.cache import CacheDisco
+from allocation.data.chains_historicas import StoreChainsHistoricas
 from allocation.data.mock_provider import ProvedorMock
 from allocation.data.yfinance_provider import ProvedorYFinance
 from allocation.logging_setup import obter_logger
 from allocation.opcoes.backtest import backtest_covered_call
+from allocation.opcoes.backtest_chains import (
+    calibracao_probabilidade,
+    replay_screener_chains,
+    validar_parametros_grid,
+)
 from allocation.opcoes.calls import processar_ativo
 from allocation.opcoes.hedge import avaliar_collar, avaliar_protective_put
 from allocation.opcoes.puts import processar_ativo_puts
@@ -32,11 +38,7 @@ def construir_provedor(config: Config) -> ProvedorDados:
     """Seleciona o provedor de dados conforme a configuração."""
     if config.modo_offline:
         return ProvedorMock(config.pasta_mock)
-    cache = (
-        CacheDisco(config.pasta_cache, config.cache_ttl_horas)
-        if config.usar_cache
-        else None
-    )
+    cache = CacheDisco(config.pasta_cache, config.cache_ttl_horas) if config.usar_cache else None
     return ProvedorYFinance(cache=cache)
 
 
@@ -57,7 +59,9 @@ def executar(
     for ativo in config.lista_ativos:
         logger.info(">>> Processando %s...", ativo)
         df_top = processar_ativo(
-            ativo, provedor, config,
+            ativo,
+            provedor,
+            config,
             salvar_mock=config.salvar_mock and not config.modo_offline,
             matriz_out=matriz_out,
         )
@@ -113,7 +117,9 @@ def executar_puts(
     for ativo in config.lista_ativos:
         logger.info(">>> Processando puts de %s...", ativo)
         df_top = processar_ativo_puts(
-            ativo, provedor, config,
+            ativo,
+            provedor,
+            config,
             salvar_mock=config.salvar_mock and not config.modo_offline,
             matriz_out=matriz_out,
         )
@@ -127,9 +133,7 @@ def executar_puts(
     return pd.concat(resultados, ignore_index=True)
 
 
-def executar_e_reportar_puts(
-    config: Config, provedor: ProvedorDados | None = None
-) -> pd.DataFrame:
+def executar_e_reportar_puts(config: Config, provedor: ProvedorDados | None = None) -> pd.DataFrame:
     """Executa a análise de puts, imprime o resumo e salva os Excel."""
     matriz: list[pd.DataFrame] = []
     df_final = executar_puts(config, provedor, matriz_out=matriz)
@@ -166,7 +170,9 @@ def executar_volatilidade(
 
     resumos = []
     detalhes: dict[str, list[pd.DataFrame]] = {
-        "term_structure": [], "cone": [], "skew": [],
+        "term_structure": [],
+        "cone": [],
+        "skew": [],
     }
     for ativo in config.lista_ativos:
         logger.info(">>> Analisando volatilidade de %s...", ativo)
@@ -312,7 +318,10 @@ def executar_backtest(
         except Exception as exc:  # noqa: BLE001
             logger.error("[%s] Erro ao obter histórico para backtest: %s", ativo, exc)
             continue
-        if dados.historico_precos is None or len(dados.historico_precos) <= janela_vol + dias_vencimento:
+        if (
+            dados.historico_precos is None
+            or len(dados.historico_precos) <= janela_vol + dias_vencimento
+        ):
             logger.info("[%s] Histórico insuficiente para backtest.", ativo)
             continue
         _, resumo = backtest_covered_call(
@@ -327,3 +336,126 @@ def executar_backtest(
         resumos.append(resumo.as_dict())
 
     return pd.DataFrame(resumos)
+
+
+# grade usada por backtest-chains --grid quando a config não traz
+# [grade_validacao]: varre o limite de probabilidade e a janela de prazo.
+GRADE_VALIDACAO_DEFAULT: dict[str, list] = {
+    "prob_exerc_max": [0.10, 0.15, 0.25],
+    "max_dias": [20, 30, 45],
+}
+
+
+def _historico_para_replay(config: Config, ativo: str) -> pd.Series | None:
+    """Série longa de fechamentos para prob. empírica/vol do replay."""
+    try:
+        dados = construir_provedor(config).obter(ativo, config.periodo_historico)
+    except Exception as exc:  # noqa: BLE001 — replay funciona sem histórico
+        logger.warning("[%s] Sem histórico de preços para o replay: %s", ativo, exc)
+        return None
+    return dados.historico_precos
+
+
+def executar_baixar_chains(
+    config: Config,
+    ativo: str,
+    inicio: str,
+    fim: str,
+    sobrescrever: bool = False,
+) -> int:
+    """Baixa chains EOD históricas (Theta Data) para o store local."""
+    from allocation.data.thetadata import baixar_chains_historicas
+
+    store = StoreChainsHistoricas(config.pasta_chains)
+    n = baixar_chains_historicas(ativo, inicio, fim, store, sobrescrever=sobrescrever)
+    logger.info("[%s] %d snapshots gravados em %s", ativo, n, config.pasta_chains)
+    return n
+
+
+def executar_backtest_chains(
+    config: Config,
+    ativo: str,
+    inicio: str | None = None,
+    fim: str | None = None,
+    grid: bool = False,
+    arquivo_saida: str | None = None,
+    top_n_executar: int = 1,
+    passo_dias: int | None = None,
+) -> pd.DataFrame:
+    """Replay do screener sobre chains históricas reais (validação de parâmetros).
+
+    Sem ``grid``: roda o replay com a config atual, imprime resumo, trades e a
+    calibração de probabilidade; Excel opcional com abas trades / resumo /
+    calibracao. Com ``grid``: roda uma combinação por linha da grade
+    (``[grade_validacao]`` da config, ou a default) e imprime/salva a tabela
+    comparativa (aba grid).
+
+    Retorna o DataFrame de trades (ou o do grid).
+    """
+    store = StoreChainsHistoricas(config.pasta_chains)
+    if not store.datas_disponiveis(ativo, inicio, fim):
+        logger.warning(
+            "[%s] Nenhum snapshot em %s — rode 'allocation baixar-chains' antes.",
+            ativo,
+            config.pasta_chains,
+        )
+        return pd.DataFrame()
+
+    historico = _historico_para_replay(config, ativo)
+
+    if grid:
+        grade = config.grade_validacao or GRADE_VALIDACAO_DEFAULT
+        df_grid = validar_parametros_grid(
+            ativo,
+            store,
+            config,
+            grade,
+            inicio=inicio,
+            fim=fim,
+            historico_precos=historico,
+            top_n_executar=top_n_executar,
+            passo_dias=passo_dias,
+        )
+        print("\n" + "=" * 80)
+        print(f"GRID DE VALIDAÇÃO DE PARÂMETROS | {ativo}")
+        print("=" * 80)
+        print(df_grid.to_string(index=False))
+        if arquivo_saida:
+            with pd.ExcelWriter(arquivo_saida) as writer:
+                df_grid.to_excel(writer, sheet_name="grid", index=False)
+            logger.info("Grid de validação salvo em: %s", arquivo_saida)
+        return df_grid
+
+    df_trades, resumo = replay_screener_chains(
+        ativo,
+        store,
+        config,
+        inicio=inicio,
+        fim=fim,
+        historico_precos=historico,
+        top_n_executar=top_n_executar,
+        passo_dias=passo_dias,
+    )
+    df_resumo = pd.DataFrame([resumo.as_dict()])
+    df_cal = calibracao_probabilidade(df_trades)
+
+    print("\n" + "=" * 80)
+    print(f"REPLAY DO SCREENER SOBRE CHAINS REAIS | {ativo}")
+    print("=" * 80)
+    print(df_resumo.to_string(index=False))
+    if not df_trades.empty:
+        print(f"\n=== {ativo} — trades executados ===")
+        print(df_trades.to_string(index=False))
+        print(f"\n=== {ativo} — calibração: prob prevista vs exercício realizado ===")
+        print(df_cal.to_string(index=False))
+    else:
+        logger.warning("[%s] Nenhum trade executado no período.", ativo)
+
+    if arquivo_saida:
+        with pd.ExcelWriter(arquivo_saida) as writer:
+            df_trades.to_excel(writer, sheet_name="trades", index=False)
+            df_resumo.to_excel(writer, sheet_name="resumo", index=False)
+            df_cal.to_excel(writer, sheet_name="calibracao", index=False)
+        logger.info("Replay salvo em: %s", arquivo_saida)
+
+    return df_trades

@@ -26,9 +26,7 @@ logger = obter_logger(__name__)
 _EPS_CUSTO = 1e-6
 
 
-def _preparar_pernas(
-    dados: DadosMercado, config: Config
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _preparar_pernas(dados: DadosMercado, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Pipelines das duas pernas: put comprada (ask) e call vendida (bid)."""
     base = dict(
         preco_atual=dados.preco_atual,
@@ -47,7 +45,8 @@ def _preparar_pernas(
     )
     df_puts = (
         preparar_puts_para_modelo(dados.df_puts, usar_premio="ask", **base)
-        if not dados.df_puts.empty else pd.DataFrame()
+        if not dados.df_puts.empty
+        else pd.DataFrame()
     )
     df_calls = preparar_calls_para_modelo(dados.df_calls, usar_premio="bid", **base)
     return df_puts, df_calls
@@ -91,10 +90,21 @@ def avaliar_protective_put(
 
     df["ativo"] = dados.ativo
     colunas = [
-        "ativo", "strike", "expiration", "dias_vencimento", "premio",
-        "custo_protecao", "custo_protecao_pct", "custo_anualizado_pct",
-        "piso", "perda_max_pct", "prob_uso", "delta_posicao",
-        "passou_liquidez", "iv_usada", "fonte_vol",
+        "ativo",
+        "strike",
+        "expiration",
+        "dias_vencimento",
+        "premio",
+        "custo_protecao",
+        "custo_protecao_pct",
+        "custo_anualizado_pct",
+        "piso",
+        "perda_max_pct",
+        "prob_uso",
+        "delta_posicao",
+        "passou_liquidez",
+        "iv_usada",
+        "fonte_vol",
     ]
     df = df[[c for c in colunas if c in df.columns]].copy()
     return df.sort_values("perda_max_pct", ignore_index=True)
@@ -133,41 +143,36 @@ def avaliar_collar(
     for expiration in vencimentos:
         # cap combinatório: melhores puts (proteção mais barata) × melhores
         # calls (mais prêmio) do vencimento
-        p = (
-            puts_otm[puts_otm["expiration"] == expiration]
-            .nsmallest(max_por_vencimento, "premio")
-        )
-        c = (
-            calls_otm[calls_otm["expiration"] == expiration]
-            .nlargest(max_por_vencimento, "premio")
-        )
+        p = puts_otm[puts_otm["expiration"] == expiration].nsmallest(max_por_vencimento, "premio")
+        c = calls_otm[calls_otm["expiration"] == expiration].nlargest(max_por_vencimento, "premio")
         for _, put in p.iterrows():
             for _, call in c.iterrows():
                 custo_liquido = (
-                    put["premio"] + custo_compra_por_acao
-                    - call["premio"] + custo_venda_por_acao
+                    put["premio"] + custo_compra_por_acao - call["premio"] + custo_venda_por_acao
                 )
                 piso = put["strike"] - custo_liquido
                 teto = call["strike"] - custo_liquido
-                linhas.append({
-                    "ativo": dados.ativo,
-                    "expiration": expiration,
-                    "dias_vencimento": put["dias_vencimento"],
-                    "strike_put": put["strike"],
-                    "strike_call": call["strike"],
-                    "premio_put": put["premio"],
-                    "premio_call": call["premio"],
-                    "custo_liquido": custo_liquido,
-                    "custo_liquido_pct": custo_liquido / spot,
-                    "piso": piso,
-                    "teto": teto,
-                    "perda_max_pct": (base - piso) / base,
-                    "ganho_max_pct": (teto - base) / base,
-                    "prob_uso_put": put["prob_exercicio_final"],
-                    "prob_exercicio_call": call["prob_exercicio_final"],
-                    "custo_anualizado_pct": (custo_liquido / spot) / put["T"],
-                    "liquidez_ok": bool(put["passou_liquidez"] and call["passou_liquidez"]),
-                })
+                linhas.append(
+                    {
+                        "ativo": dados.ativo,
+                        "expiration": expiration,
+                        "dias_vencimento": put["dias_vencimento"],
+                        "strike_put": put["strike"],
+                        "strike_call": call["strike"],
+                        "premio_put": put["premio"],
+                        "premio_call": call["premio"],
+                        "custo_liquido": custo_liquido,
+                        "custo_liquido_pct": custo_liquido / spot,
+                        "piso": piso,
+                        "teto": teto,
+                        "perda_max_pct": (base - piso) / base,
+                        "ganho_max_pct": (teto - base) / base,
+                        "prob_uso_put": put["prob_exercicio_final"],
+                        "prob_exercicio_call": call["prob_exercicio_final"],
+                        "custo_anualizado_pct": (custo_liquido / spot) / put["T"],
+                        "liquidez_ok": bool(put["passou_liquidez"] and call["passou_liquidez"]),
+                    }
+                )
 
     if not linhas:
         logger.info("[%s] Nenhum par put/call viável para collar.", dados.ativo)
@@ -177,7 +182,5 @@ def avaliar_collar(
     # perda evitada vs. posição sem proteção (que pode perder tudo): a perda
     # fica limitada a perda_max_pct — o restante (1 − perda_max) é o protegido.
     df["perda_evitada_pct"] = (1.0 - df["perda_max_pct"]).clip(lower=0)
-    df["score_hedge"] = df["perda_evitada_pct"] / np.maximum(
-        df["custo_liquido_pct"], _EPS_CUSTO
-    )
+    df["score_hedge"] = df["perda_evitada_pct"] / np.maximum(df["custo_liquido_pct"], _EPS_CUSTO)
     return df.sort_values("score_hedge", ascending=False, ignore_index=True)

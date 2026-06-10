@@ -6,4 +6,5 @@ atingir metas / cruzar stops.
 
 TODO: implementar usando histórico de allocation.data e correlação entre ativos
 """
+
 from __future__ import annotations

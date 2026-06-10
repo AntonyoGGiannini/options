@@ -47,19 +47,39 @@ def gerar_grafico_payoff_covered_call(
     ax.plot(ST, ganho_acao, color="#5B9BD5", linewidth=1.5, linestyle="--", label="Ação isolada")
     ax.plot(ST, payoff_total, color="#ED7D31", linewidth=2.5, label="Covered Call")
     ax.axhline(0, color="black", linewidth=0.8)
-    ax.axvline(preco_atual, color="#5B9BD5", linewidth=1.0, linestyle=":",
-               alpha=0.8, label=f"Preço atual  ${preco_atual:.2f}")
-    ax.axvline(strike, color="#ED7D31", linewidth=1.0, linestyle=":",
-               alpha=0.8, label=f"Strike  ${strike:.2f}")
+    ax.axvline(
+        preco_atual,
+        color="#5B9BD5",
+        linewidth=1.0,
+        linestyle=":",
+        alpha=0.8,
+        label=f"Preço atual  ${preco_atual:.2f}",
+    )
+    ax.axvline(
+        strike,
+        color="#ED7D31",
+        linewidth=1.0,
+        linestyle=":",
+        alpha=0.8,
+        label=f"Strike  ${strike:.2f}",
+    )
 
     if preco_custo is not None and abs(preco_custo - preco_atual) > 0.01:
-        ax.axvline(preco_custo, color="#70AD47", linewidth=1.0, linestyle=":",
-                   alpha=0.8, label=f"Preço médio  ${preco_custo:.2f}")
+        ax.axvline(
+            preco_custo,
+            color="#70AD47",
+            linewidth=1.0,
+            linestyle=":",
+            alpha=0.8,
+            label=f"Preço médio  ${preco_custo:.2f}",
+        )
 
     ax.annotate(
         f"Prêmio recebido: ${premio:.2f}",
         xy=(s_min + (s_max - s_min) * 0.04, premio),
-        fontsize=9, color="#ED7D31", va="bottom",
+        fontsize=9,
+        color="#ED7D31",
+        va="bottom",
     )
 
     breakeven = custo - premio + custo_venda_acao
@@ -68,15 +88,16 @@ def gerar_grafico_payoff_covered_call(
         ax.annotate(
             f"Breakeven ${breakeven:.2f}",
             xy=(breakeven, -premio * 2),
-            xytext=(4, 4), textcoords="offset points",
-            fontsize=8, color="gray",
+            xytext=(4, 4),
+            textcoords="offset points",
+            fontsize=8,
+            color="gray",
         )
 
     ax.set_xlabel("Preço do ativo no vencimento (USD)")
     ax.set_ylabel("Lucro / Prejuízo por ação (USD)")
     ax.set_title(
-        f"Payoff — Covered Call | Strike ${strike:.2f} | "
-        f"Venc. {expiration} | Prêmio ${premio:.2f}"
+        f"Payoff — Covered Call | Strike ${strike:.2f} | Venc. {expiration} | Prêmio ${premio:.2f}"
     )
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)

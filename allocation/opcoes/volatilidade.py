@@ -54,13 +54,15 @@ def term_structure_iv(df_opcoes: pd.DataFrame, preco_atual: float) -> pd.DataFra
     for expiration, grupo in df.groupby("expiration", sort=True):
         ivs_validas = grupo["impliedVolatility"].dropna()
         ivs_validas = ivs_validas[ivs_validas > 0]
-        linhas.append({
-            "expiration": expiration,
-            "dias_vencimento": int(grupo["dias_vencimento"].iloc[0]),
-            "iv_atm": _iv_atm(grupo, preco_atual),
-            "iv_media": float(ivs_validas.mean()) if not ivs_validas.empty else float("nan"),
-            "n_opcoes": len(grupo),
-        })
+        linhas.append(
+            {
+                "expiration": expiration,
+                "dias_vencimento": int(grupo["dias_vencimento"].iloc[0]),
+                "iv_atm": _iv_atm(grupo, preco_atual),
+                "iv_media": float(ivs_validas.mean()) if not ivs_validas.empty else float("nan"),
+                "n_opcoes": len(grupo),
+            }
+        )
     return pd.DataFrame(linhas).sort_values("dias_vencimento", ignore_index=True)
 
 
@@ -92,13 +94,15 @@ def rank_percentile_vol(
     série de vols rolantes dos últimos ``lookback`` pregões.
     rank = (atual − min) / (max − min); percentile = fração de vols <= atual.
     """
-    resultado = {"vol_atual": float("nan"), "vol_rank": float("nan"),
-                 "vol_percentile": float("nan")}
+    resultado = {
+        "vol_atual": float("nan"),
+        "vol_rank": float("nan"),
+        "vol_percentile": float("nan"),
+    }
     if historico is None or len(historico) < janela + 2:
         return resultado
 
-    log_ret = np.log(historico.to_numpy(dtype=float)[1:]
-                     / historico.to_numpy(dtype=float)[:-1])
+    log_ret = np.log(historico.to_numpy(dtype=float)[1:] / historico.to_numpy(dtype=float)[:-1])
     serie_ret = pd.Series(log_ret).dropna()
     vols = serie_ret.rolling(janela).std(ddof=1) * np.sqrt(252)
     vols = vols.dropna().iloc[-lookback:]
@@ -108,9 +112,7 @@ def rank_percentile_vol(
     atual = float(vols.iloc[-1])
     v_min, v_max = float(vols.min()), float(vols.max())
     resultado["vol_atual"] = atual
-    resultado["vol_rank"] = (
-        (atual - v_min) / (v_max - v_min) if v_max > v_min else float("nan")
-    )
+    resultado["vol_rank"] = (atual - v_min) / (v_max - v_min) if v_max > v_min else float("nan")
     resultado["vol_percentile"] = float((vols <= atual).mean())
     return resultado
 
@@ -125,8 +127,7 @@ def skew_por_vencimento(
     skew_otm_atm: IV OTM (call 105%) − IV ATM.
     Sem puts na fonte, calcula apenas o skew de calls e marca fonte_skew.
     """
-    colunas = ["expiration", "dias_vencimento", "skew_put_call",
-               "skew_otm_atm", "fonte_skew"]
+    colunas = ["expiration", "dias_vencimento", "skew_put_call", "skew_otm_atm", "fonte_skew"]
     if df_calls.empty:
         return pd.DataFrame(columns=colunas)
 
@@ -158,7 +159,8 @@ def skew_por_vencimento(
             grupo_puts = puts[puts["expiration"] == expiration]
             iv_put_otm = (
                 _iv_no_moneyness(grupo_puts, preco_atual * 0.95)
-                if not grupo_puts.empty else float("nan")
+                if not grupo_puts.empty
+                else float("nan")
             )
             skew_put_call = iv_put_otm - iv_call_otm
             fonte = "puts_e_calls"
@@ -166,13 +168,15 @@ def skew_por_vencimento(
             skew_put_call = float("nan")
             fonte = "apenas_calls"
 
-        linhas.append({
-            "expiration": expiration,
-            "dias_vencimento": int(grupo_calls["dias_vencimento"].iloc[0]),
-            "skew_put_call": skew_put_call,
-            "skew_otm_atm": iv_call_otm - iv_atm,
-            "fonte_skew": fonte,
-        })
+        linhas.append(
+            {
+                "expiration": expiration,
+                "dias_vencimento": int(grupo_calls["dias_vencimento"].iloc[0]),
+                "skew_put_call": skew_put_call,
+                "skew_otm_atm": iv_call_otm - iv_atm,
+                "fonte_skew": fonte,
+            }
+        )
     return pd.DataFrame(linhas).sort_values("dias_vencimento", ignore_index=True)
 
 
@@ -188,20 +192,26 @@ def analisar_volatilidade(dados: DadosMercado, config: Config) -> dict[str, pd.D
     skew = skew_por_vencimento(dados.df_calls, dados.df_puts, dados.preco_atual)
 
     iv_atm_curta = float(term["iv_atm"].iloc[0]) if not term.empty else float("nan")
-    vol_21d = float(
-        cone.loc[cone["janela"] == 21, "vol_realizada"].iloc[0]
-    ) if not cone.empty else float("nan")
+    vol_21d = (
+        float(cone.loc[cone["janela"] == 21, "vol_realizada"].iloc[0])
+        if not cone.empty
+        else float("nan")
+    )
     skew_curto = float(skew["skew_put_call"].iloc[0]) if not skew.empty else float("nan")
 
-    resumo = pd.DataFrame([{
-        "ativo": dados.ativo,
-        "preco_atual": dados.preco_atual,
-        "iv_atm_curta": iv_atm_curta,
-        "vol_21d": vol_21d,
-        "premio_vol": iv_atm_curta - vol_21d,
-        "vol_atual": rank["vol_atual"],
-        "vol_rank": rank["vol_rank"],
-        "vol_percentile": rank["vol_percentile"],
-        "skew_curto": skew_curto,
-    }])
+    resumo = pd.DataFrame(
+        [
+            {
+                "ativo": dados.ativo,
+                "preco_atual": dados.preco_atual,
+                "iv_atm_curta": iv_atm_curta,
+                "vol_21d": vol_21d,
+                "premio_vol": iv_atm_curta - vol_21d,
+                "vol_atual": rank["vol_atual"],
+                "vol_rank": rank["vol_rank"],
+                "vol_percentile": rank["vol_percentile"],
+                "skew_curto": skew_curto,
+            }
+        ]
+    )
     return {"resumo": resumo, "term_structure": term, "cone": cone, "skew": skew}

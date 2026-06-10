@@ -59,9 +59,21 @@ def test_pipeline_puts_produz_colunas(dados_ibit):
         t_max=365,
         historico_precos=dados_ibit.historico_precos,
     )
-    for col in ["prob_exercicio", "prob_empirica", "prob_exercicio_final",
-                "premio", "T", "delta", "gamma", "vega", "theta", "iv_usada",
-                "fonte_vol", "risco_atribuicao_antecipada", "distancia_strike_pct"]:
+    for col in [
+        "prob_exercicio",
+        "prob_empirica",
+        "prob_exercicio_final",
+        "premio",
+        "T",
+        "delta",
+        "gamma",
+        "vega",
+        "theta",
+        "iv_usada",
+        "fonte_vol",
+        "risco_atribuicao_antecipada",
+        "distancia_strike_pct",
+    ]:
         assert col in df.columns
     # delta de puts em (−1, 0)
     deltas = df["delta"].dropna()
@@ -76,9 +88,13 @@ def test_pipeline_puts_produz_colunas(dados_ibit):
 
 def test_processar_ativo_puts_offline_ranqueia(pasta_mock):
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo_puts("IBIT", provedor, config)
@@ -97,9 +113,13 @@ def test_processar_ativo_puts_offline_ranqueia(pasta_mock):
 
 def test_executar_puts_consolida(pasta_mock):
     config = Config(
-        lista_ativos=["IBIT"], top_n=3, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=3,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     matriz: list[pd.DataFrame] = []
     df = executar_puts(config, matriz_out=matriz)
@@ -114,9 +134,13 @@ def test_executar_puts_consolida(pasta_mock):
 def test_puts_ativo_sem_mock_de_puts_degrada(pasta_mock):
     """Ativo cujo mock não tem puts → resultado vazio sem exceção."""
     config = Config(
-        lista_ativos=["AAPL"], top_n=3, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["AAPL"],
+        top_n=3,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo_puts("AAPL", provedor, config)

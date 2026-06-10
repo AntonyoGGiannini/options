@@ -91,7 +91,11 @@ def _filtrar_qualidade(df: pd.DataFrame, spread_max: float = SPREAD_MAX_QUALIDAD
 def _normalizar_indice(serie: pd.Series) -> pd.Series:
     """Índice datetime, sem timezone, normalizado e ordenado."""
     s = serie.copy()
-    idx = pd.to_datetime(s.index)
+    try:
+        idx = pd.to_datetime(s.index)
+    except ValueError:
+        # offsets mistos (ex.: EST/EDT em CSVs do yfinance) exigem utc=True
+        idx = pd.to_datetime(s.index, utc=True)
     if idx.tz is not None:
         idx = idx.tz_localize(None)
     s.index = idx.normalize()

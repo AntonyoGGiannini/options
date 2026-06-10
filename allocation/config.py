@@ -74,6 +74,12 @@ class Config:
     custo_exercicio_min: float = 10.0
     custo_exercicio: float = 0.0  # taxa fixa adicional por contrato (opcional)
 
+    # --- chains históricas (replay/validação de parâmetros) ---
+    pasta_chains: str = "chains_historicas"
+    # grade de parâmetros do subcomando backtest-chains --grid: tabela TOML
+    # [grade_validacao] com campo da Config -> lista de valores a combinar.
+    grade_validacao: dict[str, list] | None = None
+
     # --- dados ---
     modo_offline: bool = False
     salvar_mock: bool = False
@@ -138,6 +144,14 @@ class Config:
             raise ValueError("custo_exercicio_min não pode ser negativo")
         if self.cache_ttl_horas < 0:
             raise ValueError("cache_ttl_horas não pode ser negativo")
+        if self.grade_validacao is not None:
+            nomes = {f.name for f in fields(self)}
+            invalidos = set(self.grade_validacao) - nomes
+            if invalidos:
+                raise ValueError(f"grade_validacao com campos desconhecidos: {sorted(invalidos)}")
+            for chave, valores in self.grade_validacao.items():
+                if not isinstance(valores, list) or not valores:
+                    raise ValueError(f"grade_validacao[{chave!r}] deve ser uma lista não-vazia")
         if self.peso_theta < 0:
             raise ValueError("peso_theta não pode ser negativo")
         if self.peso_vega < 0:

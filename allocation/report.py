@@ -140,8 +140,13 @@ def gerar_grafico_melhor(df_final: pd.DataFrame, config: Config) -> str | None:
     logger.info(
         "Melhor opção geral: %s | Strike %s | Venc. %s | Score %.4f | "
         "Prob. final %.2f%% (d2=%.2f%%, empírica=%s)",
-        ativo_melhor, melhor["strike"], melhor["expiration"], melhor["score_venda"],
-        melhor["prob_exercicio_final"] * 100, melhor["prob_exercicio"] * 100, prob_emp_str,
+        ativo_melhor,
+        melhor["strike"],
+        melhor["expiration"],
+        melhor["score_venda"],
+        melhor["prob_exercicio_final"] * 100,
+        melhor["prob_exercicio"] * 100,
+        prob_emp_str,
     )
 
     arquivo = gerar_grafico_payoff_covered_call(

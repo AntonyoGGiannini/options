@@ -38,17 +38,18 @@ def rankear_puts(
 
     # custo de exercício (atribuição) por contrato: na put exercida as ações são
     # compradas pelo strike — mesma base de cálculo do exercício da call.
-    custo_exerc_contrato = np.maximum(
-        config.custo_exercicio_pct * df["strike"] * config.tamanho_contrato,
-        config.custo_exercicio_min,
-    ) + config.custo_exercicio
+    custo_exerc_contrato = (
+        np.maximum(
+            config.custo_exercicio_pct * df["strike"] * config.tamanho_contrato,
+            config.custo_exercicio_min,
+        )
+        + config.custo_exercicio
+    )
     custo_exerc_por_acao = custo_exerc_contrato / config.tamanho_contrato
     df["custo_exercicio_contrato"] = custo_exerc_contrato
 
     df["premio_liquido"] = (
-        df["premio"]
-        - custo_venda_por_acao
-        - custo_exerc_por_acao * df["prob_exercicio_final"]
+        df["premio"] - custo_venda_por_acao - custo_exerc_por_acao * df["prob_exercicio_final"]
     )
 
     # colateral: caixa reservado para comprar as ações se exercido
@@ -102,13 +103,11 @@ def rankear_puts(
     # put vendida: o decaimento do prêmio (theta) beneficia o vendedor — mesma
     # construção do score das calls.
     theta_eff = (
-        (-df_filtrado["theta"] / config.dias_ano)
-        / df_filtrado["premio_liquido"].clip(lower=1e-6)
+        (-df_filtrado["theta"] / config.dias_ano) / df_filtrado["premio_liquido"].clip(lower=1e-6)
     ).clip(lower=0)
 
     vega_risk = (
-        (df_filtrado["vega"] * 0.01)
-        / df_filtrado["premio_liquido"].clip(lower=1e-6)
+        (df_filtrado["vega"] * 0.01) / df_filtrado["premio_liquido"].clip(lower=1e-6)
     ).clip(lower=0)
 
     df_filtrado["score_venda"] = (
@@ -141,8 +140,11 @@ def processar_ativo_puts(
 
         if salvar_mock:
             salvar_dados_mock(
-                ativo, dados.df_calls, dados.preco_atual,
-                dados.historico_precos, config.pasta_mock,
+                ativo,
+                dados.df_calls,
+                dados.preco_atual,
+                dados.historico_precos,
+                config.pasta_mock,
                 df_puts=dados.df_puts,
             )
 
@@ -172,7 +174,9 @@ def processar_ativo_puts(
 
         matriz_local: list[pd.DataFrame] = []
         df_top = rankear_puts(
-            df, config, dados.preco_atual,
+            df,
+            config,
+            dados.preco_atual,
             matriz_out=matriz_local if matriz_out is not None else None,
         )
         if matriz_out is not None:

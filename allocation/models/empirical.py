@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 
 
-def calcular_probabilidade_empirica_batch(precos, preco_atual_arr, strike_arr,
-                                          dias_janela_arr, min_amostras=30,
-                                          direcao="acima"):
+def calcular_probabilidade_empirica_batch(
+    precos, preco_atual_arr, strike_arr, dias_janela_arr, min_amostras=30, direcao="acima"
+):
     """
     Calcula historicamente quantas vezes o ativo cruzou o strike em janelas
     equivalentes ao prazo de cada opção. Agrupa por janela para eficiência.
@@ -32,7 +32,7 @@ def calcular_probabilidade_empirica_batch(precos, preco_atual_arr, strike_arr,
     for janela in np.unique(dias_janela_arr):
         mask = dias_janela_arr == janela
         # janelas não-sobrepostas: passo = janela
-        retornos_futuros = (precos.shift(-int(janela)) / precos - 1).iloc[::int(janela)]
+        retornos_futuros = (precos.shift(-int(janela)) / precos - 1).iloc[:: int(janela)]
         retornos_validos = retornos_futuros.dropna()
         if len(retornos_validos) < min_amostras:
             continue

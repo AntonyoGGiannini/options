@@ -34,7 +34,7 @@ def calcular_greeks_call(S0, K, T, r, q, iv):
     validos = (T_arr > 0) & (iv_arr > 0) & (K_arr > 0) & (S0_arr > 0)
     s, k, t, v = S0_arr[validos], K_arr[validos], T_arr[validos], iv_arr[validos]
     sqrt_t = np.sqrt(t)
-    d1 = (np.log(s / k) + (r - q + 0.5 * v ** 2) * t) / (v * sqrt_t)
+    d1 = (np.log(s / k) + (r - q + 0.5 * v**2) * t) / (v * sqrt_t)
     d2 = d1 - v * sqrt_t
     pdf_d1 = norm.pdf(d1)
     disc_q = np.exp(-q * t)
@@ -84,7 +84,7 @@ def calcular_greeks_put(S0, K, T, r, q, iv):
     validos = (T_arr > 0) & (iv_arr > 0) & (K_arr > 0) & (S0_arr > 0)
     s, k, t, v = S0_arr[validos], K_arr[validos], T_arr[validos], iv_arr[validos]
     sqrt_t = np.sqrt(t)
-    d1 = (np.log(s / k) + (r - q + 0.5 * v ** 2) * t) / (v * sqrt_t)
+    d1 = (np.log(s / k) + (r - q + 0.5 * v**2) * t) / (v * sqrt_t)
     d2 = d1 - v * sqrt_t
     pdf_d1 = norm.pdf(d1)
     disc_q = np.exp(-q * t)

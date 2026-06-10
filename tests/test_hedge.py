@@ -11,9 +11,12 @@ from allocation.opcoes.hedge import avaliar_collar, avaliar_protective_put
 @pytest.fixture
 def config_hedge(pasta_mock):
     return Config(
-        lista_ativos=["IBIT"], prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
 
 

@@ -29,10 +29,20 @@ def test_pipeline_produz_colunas_esperadas(dados_ibit):
         t_max=365,
         historico_precos=dados_ibit.historico_precos,
     )
-    for col in ["prob_exercicio", "prob_empirica",
-                "prob_exercicio_final", "premio", "T",
-                "delta", "gamma", "vega", "theta", "iv_usada", "fonte_vol",
-                "risco_atribuicao_antecipada"]:
+    for col in [
+        "prob_exercicio",
+        "prob_empirica",
+        "prob_exercicio_final",
+        "premio",
+        "T",
+        "delta",
+        "gamma",
+        "vega",
+        "theta",
+        "iv_usada",
+        "fonte_vol",
+        "risco_atribuicao_antecipada",
+    ]:
         assert col in df.columns
     # Delta de calls OTM deve estar em (0, 1).
     deltas = df["delta"].dropna()
@@ -44,9 +54,13 @@ def test_pipeline_produz_colunas_esperadas(dados_ibit):
 
 def test_processar_ativo_offline_ranqueia(pasta_mock):
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
@@ -59,9 +73,13 @@ def test_processar_ativo_offline_ranqueia(pasta_mock):
 
 def test_executar_consolida_resultado(pasta_mock):
     config = Config(
-        lista_ativos=["IBIT"], top_n=3, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=3,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     df = executar(config)
     assert isinstance(df, pd.DataFrame)
@@ -72,9 +90,13 @@ def test_executar_consolida_resultado(pasta_mock):
 def test_posicao_existente_com_custo(pasta_mock):
     """Com preco_medio_aquisicao, adiciona colunas de custo e alerta."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
         preco_medio_aquisicao={"IBIT": 999.0},  # custo alto → todos alertam
     )
     provedor = ProvedorMock(pasta_mock)
@@ -88,9 +110,13 @@ def test_posicao_existente_com_custo(pasta_mock):
 def test_screener_sem_custo_saida_enxuta(pasta_mock):
     """Sem custo informado (screener), as colunas de custo são omitidas."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
@@ -102,9 +128,13 @@ def test_screener_sem_custo_saida_enxuta(pasta_mock):
 def test_screener_filtra_prejuizo_se_exercido(pasta_mock):
     """Screener: toda opção retornada deve ter lucro positivo se exercida."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
@@ -118,9 +148,13 @@ def test_custo_alto_exclui_por_prejuizo_no_exercicio(pasta_mock):
     """Custo de aquisição altíssimo → vender abaixo do custo dá prejuízo se
     exercido; com o filtro ligado (padrão) nada é sugerido."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
         preco_medio_aquisicao={"IBIT": 999.0},
     )
     provedor = ProvedorMock(pasta_mock)
@@ -135,9 +169,13 @@ def test_custo_alto_exclui_por_prejuizo_no_exercicio(pasta_mock):
 def test_if_called_e_downside_presentes(pasta_mock):
     """retorno_se_exercido_anualizado e downside_protection presentes e corretos."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
     df = processar_ativo("IBIT", provedor, config)
@@ -147,7 +185,9 @@ def test_if_called_e_downside_presentes(pasta_mock):
     # para calls OTM (strike > preco_atual), if-called >= static
     otm = df[df["strike"] > df["preco_atual_ativo"]]
     if not otm.empty:
-        assert (otm["retorno_se_exercido_anualizado"] >= otm["retorno_anualizado_liquido"] - 1e-9).all()
+        assert (
+            otm["retorno_se_exercido_anualizado"] >= otm["retorno_anualizado_liquido"] - 1e-9
+        ).all()
     # downside protection é o prêmio como fração do preço: deve estar em (0, 1)
     assert (df["downside_protection"] > 0).all()
     assert (df["downside_protection"] < 1).all()
@@ -167,9 +207,13 @@ def test_matriz_inclui_todas_e_marca_status(pasta_mock):
     """A matriz traz todas as candidatas (>= selecionadas), com status válido,
     e toda opção 'ok' aparece no resultado selecionado."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=3, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=3,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     matriz: list[pd.DataFrame] = []
     df_final = executar(config, matriz_out=matriz)
@@ -185,9 +229,7 @@ def test_matriz_inclui_todas_e_marca_status(pasta_mock):
     # ranking final é um subconjunto desse universo aprovado.
     ok = df_matriz[df_matriz["status"] == "ok"]
     chaves_ok = set(zip(ok["strike"], ok["expiration"].astype(str), strict=False))
-    chaves_final = set(
-        zip(df_final["strike"], df_final["expiration"].astype(str), strict=False)
-    )
+    chaves_final = set(zip(df_final["strike"], df_final["expiration"].astype(str), strict=False))
     assert chaves_final.issubset(chaves_ok)
 
 
@@ -195,9 +237,13 @@ def test_filtro_min_retorno_configuravel(pasta_mock):
     """Com min_retorno_anualizado_liquido proibitivo, nada passa e a matriz
     marca a reprovação; com o default 0.0, o resultado é o comportamento atual."""
     base = dict(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.99,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.99,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     provedor = ProvedorMock(pasta_mock)
 
@@ -216,9 +262,13 @@ def test_matriz_status_probabilidade(pasta_mock):
     """Com prob_exerc_max muito baixo, surgem reprovações por probabilidade e
     nenhuma opção fica 'ok'."""
     config = Config(
-        lista_ativos=["IBIT"], top_n=5, prob_exerc_max=0.0,
-        min_dias=0, max_dias=365,
-        modo_offline=True, pasta_mock=pasta_mock,
+        lista_ativos=["IBIT"],
+        top_n=5,
+        prob_exerc_max=0.0,
+        min_dias=0,
+        max_dias=365,
+        modo_offline=True,
+        pasta_mock=pasta_mock,
     )
     matriz: list[pd.DataFrame] = []
     df_final = executar(config, matriz_out=matriz)

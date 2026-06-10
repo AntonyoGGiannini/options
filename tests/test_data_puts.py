@@ -17,8 +17,11 @@ def test_mock_ibit_carrega_puts(dados_ibit):
 
 def test_round_trip_salvar_e_carregar_puts(tmp_path, dados_ibit):
     salvar_dados_mock(
-        "IBIT", dados_ibit.df_calls, dados_ibit.preco_atual,
-        dados_ibit.historico_precos, str(tmp_path),
+        "IBIT",
+        dados_ibit.df_calls,
+        dados_ibit.preco_atual,
+        dados_ibit.historico_precos,
+        str(tmp_path),
         df_puts=dados_ibit.df_puts,
     )
     dados = ProvedorMock(str(tmp_path)).obter("IBIT")
@@ -29,8 +32,11 @@ def test_round_trip_salvar_e_carregar_puts(tmp_path, dados_ibit):
 def test_mock_sem_puts_degrada_gracioso(tmp_path, dados_ibit):
     """Sem arquivo de puts, o provedor carrega normalmente com df_puts vazio."""
     salvar_dados_mock(
-        "IBIT", dados_ibit.df_calls, dados_ibit.preco_atual,
-        dados_ibit.historico_precos, str(tmp_path),
+        "IBIT",
+        dados_ibit.df_calls,
+        dados_ibit.preco_atual,
+        dados_ibit.historico_precos,
+        str(tmp_path),
     )
     dados = ProvedorMock(str(tmp_path)).obter("IBIT")
     assert isinstance(dados.df_puts, pd.DataFrame)

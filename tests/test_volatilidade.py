@@ -55,9 +55,7 @@ def test_rank_percentile_vol_historico_insuficiente():
 
 def test_skew_com_puts_por_paridade_aprox_zero(dados_ibit):
     """Puts sintéticas por paridade têm a mesma IV das calls → skew ≈ 0."""
-    skew = skew_por_vencimento(
-        dados_ibit.df_calls, dados_ibit.df_puts, dados_ibit.preco_atual
-    )
+    skew = skew_por_vencimento(dados_ibit.df_calls, dados_ibit.df_puts, dados_ibit.preco_atual)
     assert not skew.empty
     assert (skew["fonte_skew"] == "puts_e_calls").all()
     validos = skew["skew_put_call"].dropna()
@@ -78,6 +76,12 @@ def test_analisar_volatilidade_retorna_quatro_chaves(dados_ibit):
     assert set(analise) == {"resumo", "term_structure", "cone", "skew"}
     resumo = analise["resumo"]
     assert len(resumo) == 1
-    for col in ["iv_atm_curta", "vol_21d", "premio_vol", "vol_rank",
-                "vol_percentile", "skew_curto"]:
+    for col in [
+        "iv_atm_curta",
+        "vol_21d",
+        "premio_vol",
+        "vol_rank",
+        "vol_percentile",
+        "skew_curto",
+    ]:
         assert col in resumo.columns

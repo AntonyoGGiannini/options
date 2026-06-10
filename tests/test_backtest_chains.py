@@ -177,6 +177,42 @@ def test_grid_de_parametros(store_replay, config_replay):
     assert (df.loc[df["min_dias"] == 12, "n_trades"] == 0).all()
 
 
+def test_config_grade_validacao():
+    cfg = Config(grade_validacao={"prob_exerc_max": [0.1, 0.2]})
+    assert cfg.grade_validacao == {"prob_exerc_max": [0.1, 0.2]}
+    with pytest.raises(ValueError, match="desconhecidos"):
+        Config(grade_validacao={"campo_inexistente": [1]})
+    with pytest.raises(ValueError, match="lista não-vazia"):
+        Config(grade_validacao={"prob_exerc_max": []})
+
+
+def test_runner_backtest_chains_e2e(store_replay, config_replay, pasta_mock, tmp_path):
+    """Fluxo completo do subcomando: replay + Excel, e modo grid."""
+    from allocation.runner import executar_backtest_chains
+
+    config = config_replay.aplicar_overrides(
+        modo_offline=True,
+        pasta_mock=pasta_mock,
+        pasta_chains=str(store_replay.pasta),
+    )
+    saida = tmp_path / "replay.xlsx"
+    df_trades = executar_backtest_chains(config, "IBIT", arquivo_saida=str(saida))
+    assert len(df_trades) == 2
+    assert saida.exists()
+    abas = pd.read_excel(saida, sheet_name=None)
+    assert set(abas) == {"trades", "resumo", "calibracao"}
+    assert abas["resumo"]["n_trades"].iloc[0] == 2
+
+    config_grid = config.aplicar_overrides(grade_validacao={"prob_exerc_max": [1e-9, 1.0]})
+    df_grid = executar_backtest_chains(config_grid, "IBIT", grid=True)
+    assert len(df_grid) == 2
+    assert df_grid.loc[df_grid["prob_exerc_max"] == 1.0, "n_trades"].iloc[0] == 2
+
+    # store vazio: avisa e retorna vazio
+    config_vazio = config.aplicar_overrides(pasta_chains=str(tmp_path / "nada"))
+    assert executar_backtest_chains(config_vazio, "IBIT").empty
+
+
 def test_grid_valida_parametros(store_replay, config_replay):
     with pytest.raises(ValueError, match="prob_exerc_max"):
         validar_parametros_grid("IBIT", store_replay, config_replay, {"prob_exerc_max": [1.5]})
