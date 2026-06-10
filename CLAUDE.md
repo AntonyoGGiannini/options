@@ -28,6 +28,9 @@ allocation --offline puts                              # cash-secured put screen
 allocation --offline vol --saida vol.xlsx              # IV term structure, cone, skew
 allocation --offline hedge --ativo IBIT --custo-medio 55.0   # protective put + collar
 allocation --offline spreads --estrategia bull_call    # or iron_condor
+allocation baixar-chains --ativo IBIT --inicio 2025-07-01 --fim 2026-06-01  # ingest real EOD chains (needs ThetaTerminal running)
+allocation --offline backtest-chains --ativo IBIT --saida replay.xlsx       # replay screener on real historical chains
+allocation --offline backtest-chains --ativo IBIT --grid                    # parameter grid validation
 
 # Tests
 python3 -m pytest                      # all tests (use python3 -m pytest, not bare pytest)
@@ -63,7 +66,8 @@ allocation/
 ├── opcoes/           — everything that uses option chains + Black-Scholes
 │   ├── calls.py      — covered call ranking (core, formerly ranking.py)
 │   ├── pipeline.py   — vectorized 30+ metric batch (formerly models/pipeline.py)
-│   ├── backtest.py   — historical covered call simulation
+│   ├── backtest.py   — historical covered call simulation (model-based premiums)
+│   ├── backtest_chains.py — screener replay on real historical chains + parameter grid
 │   ├── puts.py       — cash-secured put selling (mirror of calls; return on collateral)
 │   ├── spreads.py    — multi-leg: bull call spread, iron condor
 │   ├── volatilidade.py — IV term structure, realized-vol cone/rank, skew by moneyness
@@ -75,7 +79,8 @@ allocation/
 │   ├── analytics.py  — Greeks aggregation, VaR, drawdown, stress test [stub]
 │   ├── montecarlo.py — GBM portfolio simulation [stub]
 │   └── crises.py     — replay against historical crises [stub]
-├── data/             — shared: ProvedorDados protocol, yfinance, mock, cache, retry
+├── data/             — shared: ProvedorDados protocol, yfinance, mock, cache, retry;
+│                       chains_historicas (parquet snapshot store), thetadata (EOD chain ingestion)
 ├── models/           — shared pure math: black_scholes, empirical, greeks, volatility, payoff
 ├── config.py         — validated TOML dataclass
 ├── runner.py         — orchestrator
@@ -90,6 +95,8 @@ allocation/
 **Per-leg premium convention (hedge/spreads):** bought legs are priced at `ask`, sold legs at `bid` (conservative), regardless of the screener's `config.usar_premio`.
 
 **Probability model:** Final probability = `max(prob_d2, prob_empirica)` (conservative worst-case). d2 from Black-Scholes in `models/black_scholes.py`; empirical from non-overlapping historical windows in `models/empirical.py`.
+
+**Historical chain replay (`backtest-chains`):** `data/chains_historicas.py` stores one parquet per trading day (`{pasta_chains}/{ativo}/{YYYY-MM-DD}.parquet`, schema = superset of the mock CSV, calls+puts in a `type` column plus the closing `spot`). `data/thetadata.py` ingests EOD chains from a locally running ThetaTerminal (Theta Data; free tier = 1y of US options EOD, 20 req/min — bulk endpoints keep requests ≈ 2× number of expirations). `opcoes/backtest_chains.py` replays the *production* screener (pipeline with `data_referencia` + `rankear_calls`, no copy) day by day: sells at the real `bid`, settles at the real spot on expiration, truncates the price history at each entry date (anti-look-ahead), and reports realized returns plus predicted-vs-realized exercise calibration; `validar_parametros_grid` sweeps `[grade_validacao]` combinations via `Config.aplicar_overrides`.
 
 **Scoring:** `score_venda = retorno_se_exercido_anualizado × (1 - prob_exercicio_final) × (1 + peso_theta × theta_eff) / (1 + peso_vega × vega_risk)` — rewards if-called return and theta yield, penalizes assignment risk and vega exposure. `peso_theta` and `peso_vega` default to 0 in config (pure return × probability mode).
 
@@ -116,7 +123,7 @@ AAPL = 0.005
 IBIT = 55.00
 ```
 
-**Outputs:** The screener writes `top_opcoes_covered_call.xlsx` (ranked results) and `matriz_opcoes.xlsx` (full matrix with rejection reasons); the puts screener writes `top_opcoes_puts.xlsx`/`matriz_opcoes_puts.xlsx`. Portfolio analysis writes one Excel per client with three sheets: `covered_call`, `rolagem`, `buy_write`. `vol`/`hedge`/`spreads` save Excel only when `--saida` is given.
+**Outputs:** The screener writes `top_opcoes_covered_call.xlsx` (ranked results) and `matriz_opcoes.xlsx` (full matrix with rejection reasons); the puts screener writes `top_opcoes_puts.xlsx`/`matriz_opcoes_puts.xlsx`. Portfolio analysis writes one Excel per client with three sheets: `covered_call`, `rolagem`, `buy_write`. `vol`/`hedge`/`spreads`/`backtest-chains` save Excel only when `--saida` is given (`backtest-chains` sheets: `trades`/`resumo`/`calibracao`, or `grid`).
 
 **Running tests:** Always use `python3 -m pytest` (not bare `pytest`) to ensure the correct Python environment picks up the installed package.
 

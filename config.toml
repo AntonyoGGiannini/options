@@ -56,6 +56,12 @@ custo_exercicio_pct = 0.0025
 custo_exercicio_min = 10.00
 custo_exercicio     = 0.00   # taxa fixa adicional por contrato (opcional)
 
+# --- chains históricas (subcomandos baixar-chains / backtest-chains) ---
+# Pasta do store local de snapshots EOD ({ativo}/{YYYY-MM-DD}.parquet),
+# alimentado por 'allocation baixar-chains' (Theta Data) e consumido pelo
+# replay do screener ('allocation backtest-chains').
+# pasta_chains = "chains_historicas"
+
 # --- dados ---
 modo_offline   = false
 salvar_mock    = false
@@ -83,3 +89,10 @@ arquivo_matriz = "matriz_opcoes.xlsx"
 # [dividend_yield]
 # AAPL = 0.005
 # SPY  = 0.013
+
+# Grade de parâmetros do 'backtest-chains --grid' (campo da Config -> lista de
+# valores a combinar). Sem esta tabela, usa-se uma grade default de
+# prob_exerc_max x max_dias. Tabelas TOML devem ficar no fim do arquivo.
+# [grade_validacao]
+# prob_exerc_max = [0.10, 0.15, 0.25]
+# max_dias       = [20, 30, 45]
