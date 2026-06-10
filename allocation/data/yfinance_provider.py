@@ -63,61 +63,43 @@ class ProvedorYFinance:
             self.cache.salvar_df(chave, serie.to_frame("Close"))
         return serie
 
-    def obter_cadeia(self, ativo: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Cadeia completa de opções (calls, puts) por vencimento."""
-        chave_calls = f"{ativo}_calls"
-        chave_puts = f"{ativo}_puts"
+    def obter_calls(self, ativo: str) -> pd.DataFrame:
+        chave = f"{ativo}_calls"
         if self.cache is not None:
-            df_calls = self.cache.obter_df(chave_calls)
-            df_puts = self.cache.obter_df(chave_puts)
-            if df_calls is not None and df_puts is not None:
-                return df_calls, df_puts
+            df = self.cache.obter_df(chave)
+            if df is not None:
+                return df
 
-        def _anotar(df: pd.DataFrame, expiration: str, tipo: str) -> pd.DataFrame:
-            df = df.copy()
-            df["mid"] = (df["bid"] + df["ask"]) / 2
-            df["spread_pct"] = (df["ask"] - df["bid"]) / df["mid"]
-            df["ativo"] = ativo
-            df["expiration"] = expiration
-            df["type"] = tipo
-            return df
-
-        def _buscar() -> tuple[pd.DataFrame, pd.DataFrame]:
+        def _buscar() -> pd.DataFrame:
             ticker = yf.Ticker(ativo)
             expirations = ticker.options
 
             lista_calls = []
-            lista_puts = []
             for expiration in expirations:
                 try:
-                    cadeia = ticker.option_chain(expiration)
-                    lista_calls.append(_anotar(cadeia.calls, expiration, "CALL"))
-                    lista_puts.append(_anotar(cadeia.puts, expiration, "PUT"))
+                    calls = ticker.option_chain(expiration).calls.copy()
+                    calls["mid"] = (calls["bid"] + calls["ask"]) / 2
+                    calls["spread_pct"] = (calls["ask"] - calls["bid"]) / calls["mid"]
+                    calls["ativo"] = ativo
+                    calls["expiration"] = expiration
+                    calls["type"] = "CALL"
+                    lista_calls.append(calls)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Erro no vencimento %s de %s: %s", expiration, ativo, exc)
 
-            df_calls = pd.concat(lista_calls, ignore_index=True) if lista_calls else pd.DataFrame()
-            df_puts = pd.concat(lista_puts, ignore_index=True) if lista_puts else pd.DataFrame()
-            return df_calls, df_puts
+            return pd.concat(lista_calls, ignore_index=True) if lista_calls else pd.DataFrame()
 
-        df_calls, df_puts = com_retry(_buscar, descricao=f"cadeia de opções de {ativo}")
-        if self.cache is not None and not df_calls.empty:
-            self.cache.salvar_df(chave_calls, df_calls)
-        if self.cache is not None and not df_puts.empty:
-            self.cache.salvar_df(chave_puts, df_puts)
-        return df_calls, df_puts
-
-    def obter_calls(self, ativo: str) -> pd.DataFrame:
-        return self.obter_cadeia(ativo)[0]
+        df = com_retry(_buscar, descricao=f"cadeia de opções de {ativo}")
+        if self.cache is not None and not df.empty:
+            self.cache.salvar_df(chave, df)
+        return df
 
     # --- interface ProvedorDados ------------------------------------------
 
     def obter(self, ativo: str, periodo_historico: str = "5y") -> DadosMercado:
-        df_calls, df_puts = self.obter_cadeia(ativo)
         return DadosMercado(
             ativo=ativo,
-            df_calls=df_calls,
+            df_calls=self.obter_calls(ativo),
             preco_atual=self.calcular_preco_atual(ativo),
             historico_precos=self.carregar_historico_ativo(ativo, periodo_historico),
-            df_puts=df_puts,
         )

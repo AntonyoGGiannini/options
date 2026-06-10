@@ -76,23 +76,3 @@ def test_custo_exercicio_para_taxa_fixa_adicional():
 def test_custo_exercicio_pct_negativo_invalido():
     with pytest.raises(ValueError):
         Config(custo_exercicio_pct=-0.01)
-
-
-def test_filtros_retorno_lucro_defaults():
-    c = Config()
-    assert c.min_retorno_anualizado_liquido == 0.0
-    assert c.min_lucro_se_exercido == 0.0
-
-
-def test_filtros_retorno_lucro_negativos_permitidos():
-    # negativos relaxam o filtro deliberadamente — devem ser aceitos
-    c = Config(min_retorno_anualizado_liquido=-0.05, min_lucro_se_exercido=-0.10)
-    assert c.min_retorno_anualizado_liquido == -0.05
-    assert c.min_lucro_se_exercido == -0.10
-
-
-def test_filtros_retorno_lucro_nao_finitos_invalidos():
-    with pytest.raises(ValueError):
-        Config(min_retorno_anualizado_liquido=float("nan"))
-    with pytest.raises(ValueError):
-        Config(min_lucro_se_exercido=float("inf"))

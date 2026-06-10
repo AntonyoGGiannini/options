@@ -160,12 +160,7 @@ def _parse_carteira(dados: dict[str, Any]) -> Carteira:
 
     if not isinstance(limiar, (int, float)) or not (0.0 <= float(limiar) <= 1.0):
         raise ValueError("limiar_premio_restante deve ser um número em [0, 1].")
-    if (
-        not isinstance(rol_min, int)
-        or not isinstance(rol_max, int)
-        or rol_min < 0
-        or rol_max < rol_min
-    ):
+    if not isinstance(rol_min, int) or not isinstance(rol_max, int) or rol_min < 0 or rol_max < rol_min:
         raise ValueError("rolagem_min_dias/rolagem_max_dias inválidos.")
 
     return Carteira(
@@ -260,10 +255,7 @@ def _analisar_covered_call(
             continue
 
         df = processar_ativo(
-            pos.ativo,
-            provedor,
-            config,
-            preco_custo=pos.preco_medio,
+            pos.ativo, provedor, config, preco_custo=pos.preco_medio,
             excluir_prejuizo_exercicio=not carteira.permitir_strike_abaixo_custo,
         )
         if df.empty:
@@ -274,8 +266,7 @@ def _analisar_covered_call(
             if df.empty:
                 logger.info(
                     "[%s] Nenhum strike >= custo (%.2f); nada a sugerir.",
-                    pos.ativo,
-                    pos.preco_medio,
+                    pos.ativo, pos.preco_medio,
                 )
                 continue
 
@@ -287,7 +278,9 @@ def _analisar_covered_call(
     return pd.concat(linhas, ignore_index=True)
 
 
-def _analisar_rolagem(carteira: Carteira, config: Config, provedor: ProvedorDados) -> pd.DataFrame:
+def _analisar_rolagem(
+    carteira: Carteira, config: Config, provedor: ProvedorDados
+) -> pd.DataFrame:
     """Avalia cada call vendida: rolar (prêmio restante baixo) ou manter."""
     linhas: list[dict[str, Any]] = []
     for call in carteira.calls_vendidas:
@@ -298,7 +291,8 @@ def _analisar_rolagem(carteira: Carteira, config: Config, provedor: ProvedorDado
             continue
 
         dias_ate_venc = (
-            pd.Timestamp(call.expiration).normalize() - pd.Timestamp.today().normalize()
+            pd.Timestamp(call.expiration).normalize()
+            - pd.Timestamp.today().normalize()
         ).days
         valor_atual = _valor_recompra(call, dados, config, dias_ate_venc)
         premio_restante_pct = (
@@ -323,13 +317,8 @@ def _analisar_rolagem(carteira: Carteira, config: Config, provedor: ProvedorDado
         if candidata:
             preco_medio = carteira.preco_medio_de(call.ativo)
             alvo = _melhor_roll(
-                call,
-                dados,
-                config,
-                valor_atual,
-                preco_medio,
-                carteira.rolagem_min_dias,
-                carteira.rolagem_max_dias,
+                call, dados, config, valor_atual, preco_medio,
+                carteira.rolagem_min_dias, carteira.rolagem_max_dias,
             )
             if alvo is None:
                 linha["acao"] = "rolar (sem alvo na janela)"
@@ -354,7 +343,9 @@ def _valor_recompra(
     usa o valor intrínseco.
     """
     chain = dados.df_calls
-    match = chain[(chain["strike"] == call.strike) & (chain["expiration"] == call.expiration)]
+    match = chain[
+        (chain["strike"] == call.strike) & (chain["expiration"] == call.expiration)
+    ]
     if not match.empty:
         row = match.iloc[0]
         bid, ask = row.get("bid"), row.get("ask")
@@ -462,54 +453,23 @@ def _analisar_buy_write(
 # Relatório                                                                   #
 # --------------------------------------------------------------------------- #
 _COLS_COVERED = [
-    "ativo",
-    "contratos_sugeridos",
-    "ranking_ativo",
-    "strike",
-    "premio",
-    "expiration",
-    "dias_uteis_ate_vencimento",
-    "prob_exercicio_final",
-    "delta",
-    "retorno_anualizado_liquido",
-    "retorno_sobre_custo",
-    "capital_por_contrato",
-    "custo_exercicio_contrato",
-    "lucro_se_exercido",
-    "alerta_abaixo_custo",
-    "score_venda",
+    "ativo", "contratos_sugeridos", "ranking_ativo", "strike", "premio",
+    "expiration", "dias_uteis_ate_vencimento", "prob_exercicio_final",
+    "delta", "retorno_anualizado_liquido", "retorno_sobre_custo",
+    "capital_por_contrato", "custo_exercicio_contrato", "lucro_se_exercido",
+    "alerta_abaixo_custo", "score_venda",
 ]
 _COLS_ROLAGEM = [
-    "ativo",
-    "acao",
-    "strike_atual",
-    "venc_atual",
-    "contratos",
-    "premio_recebido",
-    "valor_recompra",
-    "premio_restante_pct",
-    "dias_ate_venc",
-    "strike_novo",
-    "venc_novo",
-    "premio_novo",
-    "credito_liquido",
+    "ativo", "acao", "strike_atual", "venc_atual", "contratos", "premio_recebido",
+    "valor_recompra", "premio_restante_pct", "dias_ate_venc",
+    "strike_novo", "venc_novo", "premio_novo", "credito_liquido",
     "prob_exercicio_final_nova",
 ]
 _COLS_BUYWRITE = [
-    "ranking_global",
-    "ativo",
-    "strike",
-    "premio",
-    "expiration",
-    "dias_uteis_ate_vencimento",
-    "prob_exercicio_final",
-    "delta",
-    "retorno_anualizado_liquido",
-    "preco_atual_ativo",
-    "capital_por_contrato",
-    "custo_exercicio_contrato",
-    "lucro_se_exercido",
-    "score_venda",
+    "ranking_global", "ativo", "strike", "premio", "expiration",
+    "dias_uteis_ate_vencimento", "prob_exercicio_final", "delta",
+    "retorno_anualizado_liquido", "preco_atual_ativo", "capital_por_contrato",
+    "custo_exercicio_contrato", "lucro_se_exercido", "score_venda",
 ]
 
 
@@ -527,9 +487,7 @@ def reportar_carteira(relatorio: RelatorioCarteira, caminho_xlsx: str) -> str:
         ("BUY-WRITE (ativos não detidos)", relatorio.buy_write, _COLS_BUYWRITE),
     ]
 
-    titulo = (
-        f"ANÁLISE DE CARTEIRA — {relatorio.cliente}" if relatorio.cliente else "ANÁLISE DE CARTEIRA"
-    )
+    titulo = f"ANÁLISE DE CARTEIRA — {relatorio.cliente}" if relatorio.cliente else "ANÁLISE DE CARTEIRA"
     print("\n" + "=" * 80)
     print(titulo)
     print("=" * 80)

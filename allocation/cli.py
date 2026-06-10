@@ -14,16 +14,7 @@ from allocation.risco.portfolio import (
     carregar_carteiras,
     reportar_carteiras,
 )
-from allocation.runner import (
-    executar_backtest,
-    executar_backtest_chains,
-    executar_baixar_chains,
-    executar_e_reportar,
-    executar_e_reportar_puts,
-    executar_hedge,
-    executar_spreads,
-    executar_volatilidade,
-)
+from allocation.runner import executar_backtest, executar_e_reportar
 
 logger = obter_logger(__name__)
 
@@ -34,172 +25,57 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Plataforma quantitativa modular para análise de portfólio e estratégias.",
     )
     parser.add_argument(
-        "-c",
-        "--config",
-        default=None,
+        "-c", "--config", default=None,
         help="Caminho para um arquivo TOML de configuração.",
     )
     parser.add_argument(
-        "--ativos",
-        default=None,
+        "--ativos", default=None,
         help="Lista de tickers separada por vírgula (sobrescreve a config).",
     )
     parser.add_argument("--top-n", type=int, default=None, help="Top N opções por ativo.")
     parser.add_argument(
-        "--offline",
-        action="store_true",
-        default=None,
+        "--offline", action="store_true", default=None,
         help="Usa dados mock locais (sem internet).",
     )
     parser.add_argument(
-        "--salvar-mock",
-        action="store_true",
-        default=None,
+        "--salvar-mock", action="store_true", default=None,
         help="Salva os dados obtidos online como arquivos mock.",
     )
     parser.add_argument(
-        "--pasta-mock",
-        default=None,
+        "--pasta-mock", default=None,
         help="Pasta dedicada para ler/salvar os dados mock (ex.: ./base_mock).",
     )
     parser.add_argument(
-        "--sem-cache",
-        action="store_true",
-        default=False,
+        "--sem-cache", action="store_true", default=False,
         help="Desabilita o cache em disco do provedor online.",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
+        "-v", "--verbose", action="store_true",
         help="Logging em nível DEBUG.",
     )
 
     sub = parser.add_subparsers(dest="comando")
     parser.set_defaults(comando="run")
 
-    sub.add_parser("puts", help="Screener de venda de puts cash-secured.")
-
-    vol = sub.add_parser("vol", help="Análise de volatilidade (term structure, cone, skew).")
-    vol.add_argument(
-        "--saida",
-        default=None,
-        help="Arquivo Excel de saída (abas: resumo, term_structure, cone, skew).",
-    )
-
-    hg = sub.add_parser("hedge", help="Protective put e collar para uma posição em um ativo.")
-    hg.add_argument("--ativo", required=True, help="Ticker da posição a proteger.")
-    hg.add_argument(
-        "--custo-medio",
-        type=float,
-        default=None,
-        help="Preço médio de aquisição da posição (default: preço de mercado).",
-    )
-    hg.add_argument(
-        "--saida", default=None, help="Arquivo Excel de saída (abas: protective_put, collar)."
-    )
-
-    sp = sub.add_parser("spreads", help="Avaliação de spreads (bull call, iron condor).")
-    sp.add_argument(
-        "--estrategia",
-        default="bull_call",
-        choices=["bull_call", "iron_condor"],
-        help="Estratégia multi-perna a avaliar.",
-    )
-    sp.add_argument(
-        "--saida", default=None, help="Arquivo Excel de saída com todos os spreads avaliados."
-    )
-
     bt = sub.add_parser("backtest", help="Backtest da estratégia sobre o histórico.")
-    bt.add_argument(
-        "--distancia",
-        type=float,
-        default=0.05,
-        help="Distância do strike OTM (ex.: 0.05 = 5%% acima).",
-    )
-    bt.add_argument("--dias", type=int, default=14, help="Horizonte até o vencimento, em pregões.")
-    bt.add_argument(
-        "--janela-vol", type=int, default=60, help="Janela (pregões) da volatilidade realizada."
-    )
-
-    bc = sub.add_parser(
-        "baixar-chains",
-        help="Baixa chains de opções EOD históricas (Theta Data) para o store local.",
-    )
-    bc.add_argument("--ativo", required=True, help="Ticker do subjacente.")
-    bc.add_argument("--inicio", required=True, help="Data inicial (YYYY-MM-DD).")
-    bc.add_argument("--fim", required=True, help="Data final (YYYY-MM-DD).")
-    bc.add_argument(
-        "--pasta-chains",
-        default=None,
-        help="Pasta do store de snapshots (default: config.pasta_chains).",
-    )
-    bc.add_argument(
-        "--sobrescrever", action="store_true", help="Rebaixa snapshots já existentes no store."
-    )
-
-    rc = sub.add_parser(
-        "backtest-chains",
-        help="Replay do screener sobre chains históricas reais (validação de parâmetros).",
-    )
-    rc.add_argument("--ativo", required=True, help="Ticker do subjacente.")
-    rc.add_argument("--inicio", default=None, help="Primeiro pregão do replay (YYYY-MM-DD).")
-    rc.add_argument("--fim", default=None, help="Último pregão do replay (YYYY-MM-DD).")
-    rc.add_argument(
-        "--grid",
-        action="store_true",
-        help="Roda a grade de parâmetros ([grade_validacao] da config ou default).",
-    )
-    rc.add_argument(
-        "--saida",
-        default=None,
-        help="Arquivo Excel de saída (abas: trades, resumo, calibracao ou grid).",
-    )
-    rc.add_argument(
-        "--top-n-exec",
-        type=int,
-        default=1,
-        help="Quantas das melhores calls vender por pregão de entrada.",
-    )
-    rc.add_argument(
-        "--passo-dias",
-        type=int,
-        default=None,
-        help="Passo fixo em pregões (default: sequencial, sem sobreposição).",
-    )
-    rc.add_argument(
-        "--pasta-chains",
-        default=None,
-        help="Pasta do store de snapshots (default: config.pasta_chains).",
-    )
+    bt.add_argument("--distancia", type=float, default=0.05,
+                    help="Distância do strike OTM (ex.: 0.05 = 5%% acima).")
+    bt.add_argument("--dias", type=int, default=14,
+                    help="Horizonte até o vencimento, em pregões.")
+    bt.add_argument("--janela-vol", type=int, default=60,
+                    help="Janela (pregões) da volatilidade realizada.")
 
     ca = sub.add_parser("carteira", help="Analisa a carteira de um ou mais clientes (JSON).")
-    ca.add_argument(
-        "--arquivo",
-        required=True,
-        help="Caminho do JSON com a posição (um cliente ou um array de clientes).",
-    )
-    ca.add_argument(
-        "--saida", default=".", help="Pasta de saída; gera analise_<cliente>.xlsx por cliente."
-    )
-    ca.add_argument(
-        "--limiar-premio-restante",
-        type=float,
-        default=None,
-        help="Gatilho de rolagem: fração do prêmio ainda em aberto (ex.: 0.20).",
-    )
-    ca.add_argument(
-        "--rolagem-min-dias",
-        type=int,
-        default=None,
-        help="Mínimo de dias até o vencimento-alvo do roll-out.",
-    )
-    ca.add_argument(
-        "--rolagem-max-dias",
-        type=int,
-        default=None,
-        help="Máximo de dias até o vencimento-alvo do roll-out.",
-    )
+    ca.add_argument("--arquivo", required=True,
+                    help="Caminho do JSON com a posição (um cliente ou um array de clientes).")
+    ca.add_argument("--saida", default=".",
+                    help="Pasta de saída; gera analise_<cliente>.xlsx por cliente.")
+    ca.add_argument("--limiar-premio-restante", type=float, default=None,
+                    help="Gatilho de rolagem: fração do prêmio ainda em aberto (ex.: 0.20).")
+    ca.add_argument("--rolagem-min-dias", type=int, default=None,
+                    help="Mínimo de dias até o vencimento-alvo do roll-out.")
+    ca.add_argument("--rolagem-max-dias", type=int, default=None,
+                    help="Máximo de dias até o vencimento-alvo do roll-out.")
 
     return parser.parse_args(argv)
 
@@ -230,32 +106,6 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("Configuração inválida: %s", exc)
         return 2
 
-    if args.comando == "puts":
-        df_final = executar_e_reportar_puts(config)
-        return 0 if not df_final.empty else 1
-
-    if args.comando == "vol":
-        df_resumo = executar_volatilidade(config, arquivo_saida=args.saida)
-        return 0 if not df_resumo.empty else 1
-
-    if args.comando == "hedge":
-        resultado = executar_hedge(
-            config,
-            args.ativo,
-            preco_custo=args.custo_medio,
-            arquivo_saida=args.saida,
-        )
-        tem_resultado = any(not df.empty for df in resultado.values())
-        return 0 if tem_resultado else 1
-
-    if args.comando == "spreads":
-        df_spreads = executar_spreads(
-            config,
-            estrategia=args.estrategia,
-            arquivo_saida=args.saida,
-        )
-        return 0 if not df_spreads.empty else 1
-
     if args.comando == "backtest":
         df = executar_backtest(
             config,
@@ -271,31 +121,6 @@ def main(argv: list[str] | None = None) -> int:
         print("=" * 80)
         print(df.to_string(index=False))
         return 0
-
-    if args.comando == "baixar-chains":
-        config = config.aplicar_overrides(pasta_chains=args.pasta_chains)
-        n = executar_baixar_chains(
-            config,
-            args.ativo,
-            args.inicio,
-            args.fim,
-            sobrescrever=args.sobrescrever,
-        )
-        return 0 if n > 0 else 1
-
-    if args.comando == "backtest-chains":
-        config = config.aplicar_overrides(pasta_chains=args.pasta_chains)
-        df = executar_backtest_chains(
-            config,
-            args.ativo,
-            inicio=args.inicio,
-            fim=args.fim,
-            grid=args.grid,
-            arquivo_saida=args.saida,
-            top_n_executar=args.top_n_exec,
-            passo_dias=args.passo_dias,
-        )
-        return 0 if not df.empty else 1
 
     if args.comando == "carteira":
         try:

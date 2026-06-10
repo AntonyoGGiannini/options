@@ -31,13 +31,6 @@ max_dias    = 20
 # 0.0 = apenas OTM (padrão). Valores negativos permitem ITM, ex.: -0.05 = até 5% ITM.
 min_distancia_strike_pct = 0.0
 
-# --- filtros de retorno/lucro ---
-# Limiares mínimos (estritos) do ranking. 0.0 preserva o comportamento padrão
-# (exige retorno e lucro positivos); valores negativos relaxam o filtro, ex.:
-# min_lucro_se_exercido = -0.01 aceita exercício com prejuízo de até 1 centavo/ação.
-min_retorno_anualizado_liquido = 0.0
-min_lucro_se_exercido          = 0.0
-
 # --- filtro de liquidez ---
 # Limiares de liquidez. Não descartam mais a opção: viram a flag passou_liquidez,
 # usada como condição do ranking e exibida na matriz completa (coluna status).
@@ -55,12 +48,6 @@ custo_venda      = 0.00
 custo_exercicio_pct = 0.0025
 custo_exercicio_min = 10.00
 custo_exercicio     = 0.00   # taxa fixa adicional por contrato (opcional)
-
-# --- chains históricas (subcomandos baixar-chains / backtest-chains) ---
-# Pasta do store local de snapshots EOD ({ativo}/{YYYY-MM-DD}.parquet),
-# alimentado por 'allocation baixar-chains' (Theta Data) e consumido pelo
-# replay do screener ('allocation backtest-chains').
-# pasta_chains = "chains_historicas"
 
 # --- dados ---
 modo_offline   = false
@@ -89,10 +76,3 @@ arquivo_matriz = "matriz_opcoes.xlsx"
 # [dividend_yield]
 # AAPL = 0.005
 # SPY  = 0.013
-
-# Grade de parâmetros do 'backtest-chains --grid' (campo da Config -> lista de
-# valores a combinar). Sem esta tabela, usa-se uma grade default de
-# prob_exerc_max x max_dias. Tabelas TOML devem ficar no fim do arquivo.
-# [grade_validacao]
-# prob_exerc_max = [0.10, 0.15, 0.25]
-# max_dias       = [20, 30, 45]
