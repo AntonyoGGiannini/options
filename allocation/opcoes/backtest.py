@@ -76,33 +76,24 @@ def backtest_covered_call(
         retorno_cc = (valor_acao - s0 + premio) / s0
         retorno_bh = (s_final - s0) / s0
 
-        registros.append(
-            {
-                "idx": t,
-                "S0": s0,
-                "strike": k,
-                "vol": vol,
-                "premio": premio,
-                "S_final": s_final,
-                "exercido": exercido,
-                "retorno_cc": retorno_cc,
-                "retorno_buy_hold": retorno_bh,
-            }
-        )
+        registros.append({
+            "idx": t,
+            "S0": s0,
+            "strike": k,
+            "vol": vol,
+            "premio": premio,
+            "S_final": s_final,
+            "exercido": exercido,
+            "retorno_cc": retorno_cc,
+            "retorno_buy_hold": retorno_bh,
+        })
 
     df = pd.DataFrame(registros)
     if df.empty:
         resumo = ResumoBacktest(
-            ativo,
-            0,
-            distancia_strike_pct,
-            dias_vencimento,
-            float("nan"),
-            float("nan"),
-            float("nan"),
-            float("nan"),
-            float("nan"),
-            float("nan"),
+            ativo, 0, distancia_strike_pct, dias_vencimento,
+            float("nan"), float("nan"), float("nan"), float("nan"),
+            float("nan"), float("nan"),
         )
         return df, resumo
 

@@ -36,27 +36,17 @@ def _config(pasta_mock: str) -> Config:
 # --------------------------------------------------------------------------- #
 def test_carregar_carteira_valida(tmp_path):
     arq = tmp_path / "c.json"
-    arq.write_text(
-        json.dumps(
-            {
-                "cliente": "Fulano",
-                "caixa": 1000,
-                "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
-                "calls_vendidas": [
-                    {
-                        "ativo": "IBIT",
-                        "strike": 45.0,
-                        "expiration": "2026-06-18",
-                        "premio_recebido": 2.0,
-                        "contratos": 1,
-                    }
-                ],
-                "limiar_premio_restante": 0.15,
-                "rolagem_min_dias": 14,
-                "rolagem_max_dias": 45,
-            }
-        )
-    )
+    arq.write_text(json.dumps({
+        "cliente": "Fulano",
+        "caixa": 1000,
+        "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
+        "calls_vendidas": [{"ativo": "IBIT", "strike": 45.0,
+                            "expiration": "2026-06-18", "premio_recebido": 2.0,
+                            "contratos": 1}],
+        "limiar_premio_restante": 0.15,
+        "rolagem_min_dias": 14,
+        "rolagem_max_dias": 45,
+    }))
     cart = carregar_carteira(arq)
     assert cart.cliente == "Fulano"
     assert cart.caixa == 1000
@@ -86,20 +76,12 @@ def test_carregar_carteira_arquivo_inexistente(tmp_path):
 # --------------------------------------------------------------------------- #
 def test_carregar_carteiras_array(tmp_path):
     arq = tmp_path / "c.json"
-    arq.write_text(
-        json.dumps(
-            [
-                {
-                    "cliente": "Fulano",
-                    "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
-                },
-                {
-                    "cliente": "Beltrano",
-                    "posicoes": [{"ativo": "AAPL", "quantidade": 100, "preco_medio": 180.0}],
-                },
-            ]
-        )
-    )
+    arq.write_text(json.dumps([
+        {"cliente": "Fulano",
+         "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}]},
+        {"cliente": "Beltrano",
+         "posicoes": [{"ativo": "AAPL", "quantidade": 100, "preco_medio": 180.0}]},
+    ]))
     carteiras = carregar_carteiras(arq)
     assert len(carteiras) == 2
     assert carteiras[0].cliente == "Fulano"
@@ -110,14 +92,10 @@ def test_carregar_carteiras_array(tmp_path):
 def test_carregar_carteiras_objeto_unico_retrocompat(tmp_path):
     # formato antigo (objeto único) ainda vira lista de um elemento
     arq = tmp_path / "c.json"
-    arq.write_text(
-        json.dumps(
-            {
-                "cliente": "Fulano",
-                "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
-            }
-        )
-    )
+    arq.write_text(json.dumps({
+        "cliente": "Fulano",
+        "posicoes": [{"ativo": "IBIT", "quantidade": 300, "preco_medio": 38.0}],
+    }))
     carteiras = carregar_carteiras(arq)
     assert len(carteiras) == 1
     assert carteiras[0].cliente == "Fulano"

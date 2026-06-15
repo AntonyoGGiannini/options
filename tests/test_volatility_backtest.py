@@ -32,11 +32,8 @@ def test_backtest_serie_crescente_sempre_exercida():
     # Série sempre subindo mais que a distância -> exercício em todo trade.
     precos = pd.Series(np.linspace(100.0, 400.0, 400))
     df, resumo = backtest_covered_call(
-        precos,
-        ativo="X",
-        distancia_strike_pct=0.02,
-        dias_vencimento=10,
-        janela_vol=30,
+        precos, ativo="X", distancia_strike_pct=0.02,
+        dias_vencimento=10, janela_vol=30,
     )
     assert resumo.n_trades > 0
     # Série fortemente altista -> exercício na grande maioria dos trades.
@@ -67,6 +64,5 @@ def test_dividend_para_dict():
 
 def test_dividend_dict_negativo_invalido():
     import pytest
-
     with pytest.raises(ValueError):
         Config(dividend_yield={"AAPL": -0.01})

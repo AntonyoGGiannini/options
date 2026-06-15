@@ -6,5 +6,4 @@ volatilidade realizada e recuperação entre crises.
 
 TODO: implementar usando histórico longo (10y+) via allocation.data
 """
-
 from __future__ import annotations

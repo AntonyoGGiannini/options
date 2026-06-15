@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 import pandas as pd
@@ -16,8 +16,6 @@ class DadosMercado:
     df_calls: pd.DataFrame
     preco_atual: float
     historico_precos: pd.Series
-    # cadeia de puts (opcional; vazia quando a fonte não fornece)
-    df_puts: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 class ProvedorDados(Protocol):

@@ -34,11 +34,7 @@ def com_retry(
                 break
             logger.warning(
                 "Falha em %s (tentativa %d/%d): %s — aguardando %.0fs",
-                descricao,
-                tentativa,
-                tentativas,
-                exc,
-                espera,
+                descricao, tentativa, tentativas, exc, espera,
             )
             time.sleep(espera)
             espera *= 2

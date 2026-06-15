@@ -45,20 +45,19 @@ def rankear_calls(
 
     # custo de exercício por contrato depende do strike: max(pct * valor de
     # venda, mínimo) + taxa fixa. Convertido para base por ação.
-    custo_exerc_contrato = (
-        np.maximum(
-            config.custo_exercicio_pct * df["strike"] * config.tamanho_contrato,
-            config.custo_exercicio_min,
-        )
-        + config.custo_exercicio
-    )
+    custo_exerc_contrato = np.maximum(
+        config.custo_exercicio_pct * df["strike"] * config.tamanho_contrato,
+        config.custo_exercicio_min,
+    ) + config.custo_exercicio
     custo_exerc_por_acao = custo_exerc_contrato / config.tamanho_contrato
     df["custo_exercicio_contrato"] = custo_exerc_contrato
 
     # prêmio líquido esperado: desconta o custo de venda e o custo de exercício
     # ponderado pela probabilidade de a call ser exercida.
     df["premio_liquido"] = (
-        df["premio"] - custo_venda_por_acao - custo_exerc_por_acao * df["prob_exercicio_final"]
+        df["premio"]
+        - custo_venda_por_acao
+        - custo_exerc_por_acao * df["prob_exercicio_final"]
     )
     df["rendimento_liquido"] = df["premio_liquido"] / df["preco_atual"]
     df["retorno_anualizado_liquido"] = df["rendimento_liquido"] / df["T"]
@@ -94,9 +93,9 @@ def rankear_calls(
 
     cond_prob = df["prob_exercicio_final"] <= config.prob_exerc_max
     cond_strike = df["distancia_strike_pct"] >= config.min_distancia_strike_pct
-    cond_retorno = df["retorno_anualizado_liquido"] > config.min_retorno_anualizado_liquido
+    cond_retorno = df["retorno_anualizado_liquido"] > 0
     cond_lucro = (
-        df["lucro_se_exercido"] > config.min_lucro_se_exercido
+        df["lucro_se_exercido"] > 0
         if excluir_prejuizo_exercicio
         else pd.Series(True, index=df.index)
     )
@@ -127,11 +126,13 @@ def rankear_calls(
         return df_filtrado
 
     theta_eff = (
-        (-df_filtrado["theta"] / config.dias_ano) / df_filtrado["premio_liquido"].clip(lower=1e-6)
+        (-df_filtrado["theta"] / config.dias_ano)
+        / df_filtrado["premio_liquido"].clip(lower=1e-6)
     ).clip(lower=0)
 
     vega_risk = (
-        (df_filtrado["vega"] * 0.01) / df_filtrado["premio_liquido"].clip(lower=1e-6)
+        (df_filtrado["vega"] * 0.01)
+        / df_filtrado["premio_liquido"].clip(lower=1e-6)
     ).clip(lower=0)
 
     df_filtrado["score_venda"] = (
@@ -147,7 +148,9 @@ def rankear_calls(
     if preco_custo is not None:
         df_filtrado["capital_por_contrato"] = preco_custo * config.tamanho_contrato
         # retorno sobre o custo real da posição existente
-        df_filtrado["retorno_sobre_custo"] = df_filtrado["premio_liquido"] / preco_custo
+        df_filtrado["retorno_sobre_custo"] = (
+            df_filtrado["premio_liquido"] / preco_custo
+        )
         # alerta: vender strike abaixo do custo trava prejuízo se exercido
         df_filtrado["alerta_abaixo_custo"] = df_filtrado["strike"] < preco_custo
 
@@ -186,12 +189,8 @@ def processar_ativo(
 
         if salvar_mock:
             salvar_dados_mock(
-                ativo,
-                dados.df_calls,
-                dados.preco_atual,
-                dados.historico_precos,
-                config.pasta_mock,
-                df_puts=dados.df_puts,
+                ativo, dados.df_calls, dados.preco_atual,
+                dados.historico_precos, config.pasta_mock,
             )
 
         if dados.df_calls.empty:
@@ -222,10 +221,7 @@ def processar_ativo(
             preco_custo = config.preco_custo_para(ativo)
         matriz_local: list[pd.DataFrame] = []
         df_top = rankear_calls(
-            df,
-            config,
-            dados.preco_atual,
-            preco_custo=preco_custo,
+            df, config, dados.preco_atual, preco_custo=preco_custo,
             excluir_prejuizo_exercicio=excluir_prejuizo_exercicio,
             matriz_out=matriz_local if matriz_out is not None else None,
         )
